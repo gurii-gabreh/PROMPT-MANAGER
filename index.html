@@ -875,30 +875,32 @@
         </div>
 
         <div class="gen-section">
-          <div class="section-title"><div class="step-num">3</div>参考プロンプトを選択（任意）</div>
+          <div class="section-title"><div class="step-num">3</div>参考プロンプト（任意・未選択ならAIが自動選定）</div>
           <div>
-            <label>chapro.jpのプロンプトを参考にする場合は選択</label>
+            <label>手動で指定したい場合のみ選択（通常は空でOK。AIが候補から自動で選びます）</label>
             <input type="text" id="refSearch" placeholder="🔍 参考プロンプトを検索..." oninput="filterRefPrompts()" style="margin-bottom:8px;">
             <div class="ref-prompt-list" id="refPromptList">
               <div style="color:var(--text2);font-size:12px;padding:8px;">プロンプト一覧を読み込んでください</div>
             </div>
           </div>
           <div id="selectedRefInfo" style="display:none;">
-            <div style="font-size:12px;color:var(--text2);">選択中：</div>
+            <div style="font-size:12px;color:var(--text2);">手動選択中：</div>
             <div id="selectedRefTitle" style="font-size:13px;color:var(--accent2);font-weight:600;"></div>
+            <button class="btn btn-secondary" onclick="clearSelectedRef()" style="margin-top:6px;font-size:11px;padding:4px 10px;">選択解除（AI自動選定に戻す）</button>
           </div>
         </div>
 
-        <button class="btn btn-primary" onclick="generatePrompt()" style="padding:14px;">
-          ✨ Gemini用プロンプトを生成する
+        <button class="btn btn-primary" onclick="generatePrompt()" style="padding:14px;" id="generateBtn">
+          ✨ プロンプトを自動生成する
         </button>
+        <div style="font-size:11px;color:var(--text2);">※ 生成にはローカル生成サーバー（Mac側でターミナル起動）が必要です</div>
       </div>
 
       <!-- 右カラム：生成結果 -->
       <div style="display:flex;flex-direction:column;gap:16px;">
 
         <div class="gen-section" style="flex:1;">
-          <div class="section-title"><div class="step-num">4</div>生成されたGemini用プロンプト</div>
+          <div class="section-title"><div class="step-num">4</div>自動生成されたプロンプト</div>
 
           <div class="gen-prompt-box empty" id="generatedPromptBox">
             ← 左側で条件を入力して生成ボタンを押してください
@@ -906,29 +908,7 @@
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-secondary" onclick="copyGenerated()" id="copyBtn" style="display:none;">📋 コピー</button>
-            <button class="btn btn-secondary" onclick="openGemini()" id="openGeminiBtn" style="display:none;">🌐 Geminiを開く</button>
           </div>
-
-          <!-- Gemini誘導ガイド -->
-          <div class="gemini-guide" id="geminiGuide" style="display:none;">
-            <div class="gemini-guide-title">🤖 Geminiでの手順</div>
-            <div class="gemini-guide-steps">
-              <div><span>1</span>上の「コピー」ボタンでプロンプトをコピー</div>
-              <div><span>2</span>「Geminiを開く」でGeminiの新しいウィンドウを開く</div>
-              <div><span>3</span>Geminiにプロンプトを貼り付けて送信</div>
-              <div><span>4</span>Geminiの回答を下の「結果貼り付け」に貼り付けて保存</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 結果貼り付けセクション -->
-        <div class="gen-section" id="resultSection" style="display:none;">
-          <div class="section-title"><div class="step-num">5</div>Geminiの回答を貼り付け</div>
-          <div>
-            <label>Geminiが生成したプロンプトをここに貼り付けてください</label>
-            <textarea id="geminiResult" rows="6" placeholder="Geminiの回答をここに貼り付け..."></textarea>
-          </div>
-          <button class="btn btn-green" onclick="saveResult()">💾 スプレッドシートに保存</button>
         </div>
 
       </div>
@@ -979,6 +959,12 @@
     </div>
 
     <div class="settings-group">
+      <div class="settings-label">ローカル生成サーバー URL</div>
+      <input type="text" id="localServerUrl" placeholder="http://localhost:5678" style="font-size:12px;font-family:var(--mono);">
+      <div style="font-size:11px;color:var(--text2);">Mac側で <code style="background:var(--bg);padding:1px 4px;border-radius:4px;">local-server</code> を起動した際のURL（初期値：http://localhost:5678）</div>
+    </div>
+
+    <div class="settings-group">
       <div class="settings-label">1ページあたりの表示件数</div>
       <select id="pageSizeSetting">
         <option value="20">20件</option>
@@ -1015,6 +1001,21 @@
   </div>
 </div>
 
+<!-- ===== ローカルサーバー停止確認モーダル ===== -->
+<div class="modal-overlay" id="stopServerModal">
+  <div class="settings-modal" style="max-width:420px;">
+    <div class="settings-title">🛑 ターミナルを停止しますか？</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+      生成が完了しました。ローカル生成サーバー（ターミナル）を停止しますか？<br>
+      続けて生成する場合は「いいえ」を選んでください。
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeStopServerModal()">いいえ（続行）</button>
+      <button class="btn btn-primary" onclick="confirmStopServer()">はい（停止）</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== トースト通知 ===== -->
 <div class="toast" id="toast"></div>
 
@@ -1022,11 +1023,12 @@
 // ============================================================
 // 状態管理
 // ============================================================
-let GAS_URL      = localStorage.getItem('chapro_gas_url') || '';
+let GAS_URL          = localStorage.getItem('chapro_gas_url') || '';
+let LOCAL_SERVER_URL = localStorage.getItem('chapro_local_server') || 'http://localhost:5678';
 let currentPage  = 1;
 let totalPages   = 1;
 let allPrompts   = []; // 参照用プロンプト一覧（全件）
-let selectedRef  = null; // 選択中の参照プロンプト
+let selectedRef  = null; // 手動選択中の参照プロンプト（未選択ならAIが自動選定）
 
 // ============================================================
 // 初期化
@@ -1284,87 +1286,160 @@ function selectRef(p, el) {
   document.getElementById('selectedRefTitle').textContent = p.title;
 }
 
-function generatePrompt() {
-  const targetAI  = document.getElementById('targetAI').value;
-  const requirement = document.getElementById('userRequirement').value.trim();
+function clearSelectedRef() {
+  selectedRef = null;
+  document.querySelectorAll('.ref-prompt-item').forEach(i => i.classList.remove('selected'));
+  document.getElementById('selectedRefInfo').style.display = 'none';
+}
+
+// ============================================================
+// 参考プロンプトの自動絞り込み（2文字bigram一致度によるスコアリング）
+// 日本語には分かち書きが無いため、簡易的なn-gramでスコアリングし
+// 上位候補だけをローカルのclaude CLIに渡して最終判断させる。
+// ============================================================
+function toBigrams(text) {
+  const s = String(text || '').replace(/\s+/g, '');
+  const grams = new Set();
+  for (let i = 0; i < s.length - 1; i++) grams.add(s.substring(i, i + 2));
+  return grams;
+}
+
+function scoreCandidates(requirement, prompts, topN) {
+  const reqGrams = toBigrams(requirement);
+  if (reqGrams.size === 0) return [];
+
+  const scored = prompts.map(p => {
+    const targetGrams = toBigrams((p.title || '') + ' ' + (p.category || '') + ' ' + (p.body || '').slice(0, 500));
+    let matches = 0;
+    reqGrams.forEach(g => { if (targetGrams.has(g)) matches++; });
+    return { p, score: matches };
+  });
+
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN)
+    .map(s => s.p);
+}
+
+// ============================================================
+// ローカル生成サーバー呼び出し
+// ============================================================
+async function checkLocalServer() {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3000);
+    const res = await fetch(LOCAL_SERVER_URL + '/health', { signal: ctrl.signal });
+    clearTimeout(timer);
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function generatePrompt() {
+  const targetAI     = document.getElementById('targetAI').value;
+  const requirement  = document.getElementById('userRequirement').value.trim();
+  const generateBtn  = document.getElementById('generateBtn');
 
   if (!requirement) {
     showToast('⚠️ 「やりたいこと」を入力してください', 'error');
     return;
   }
 
-  // Geminiに渡す指示プロンプトを生成
-  let prompt = '';
-  prompt += `# ${targetAI}向けプロンプト生成依頼\n\n`;
-  prompt += `## 依頼内容\n${requirement}\n\n`;
+  generateBtn.disabled = true;
+  const box = document.getElementById('generatedPromptBox');
+  box.classList.add('empty');
+  box.textContent = '生成中...ローカルのclaude CLIで処理しています';
 
-  if (selectedRef) {
-    prompt += `## 参考プロンプト（chapro.jp より）\n`;
-    prompt += `タイトル：${selectedRef.title}\n`;
-    prompt += `カテゴリ：${selectedRef.category}\n`;
-    prompt += `本文：\n${selectedRef.body}\n\n`;
-    prompt += `上記の参考プロンプトの構成・スタイルを参考にしながら、以下の条件で新しいプロンプトを作成してください。\n\n`;
+  const online = await checkLocalServer();
+  if (!online) {
+    generateBtn.disabled = false;
+    box.textContent = '← 左側で条件を入力して生成ボタンを押してください';
+    showToast(
+      '⚠️ ローカル生成サーバーに接続できません。Macでターミナルを起動してください（local-server フォルダで node server.js）',
+      'error',
+      7000
+    );
+    return;
   }
 
-  prompt += `## 作成条件\n`;
-  prompt += `- 対象AI：${targetAI}\n`;
-  prompt += `- 言語：日本語\n`;
-  prompt += `- ${targetAI}の特性（能力・制約・得意分野）を最大限に活かした内容にすること\n`;
-  prompt += `- 誰でも使いやすいよう、プロンプトの冒頭に使い方の簡単な説明を入れること\n`;
-  prompt += `- プロンプト本文と使用例を含めること\n\n`;
-  prompt += `## 出力形式\n`;
-  prompt += `【プロンプトタイトル】\n`;
-  prompt += `【プロンプト本文】\n`;
-  prompt += `【使い方・使用例】\n`;
-  prompt += `【期待できる効果】\n`;
+  // 参考プロンプト候補を決定：手動選択があればそれのみ、無ければ自動絞り込み上位5件
+  if (allPrompts.length === 0) await loadRefPrompts();
+  const candidates = selectedRef ? [selectedRef] : scoreCandidates(requirement, allPrompts, 5);
 
-  // 表示
-  const box = document.getElementById('generatedPromptBox');
+  let data;
+  try {
+    const res = await fetch(LOCAL_SERVER_URL + '/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetAI, requirement, candidates })
+    });
+    data = await res.json();
+  } catch (e) {
+    generateBtn.disabled = false;
+    box.textContent = '← 左側で条件を入力して生成ボタンを押してください';
+    showToast('❌ ローカルサーバーとの通信に失敗しました: ' + e.message, 'error', 7000);
+    return;
+  }
+
+  generateBtn.disabled = false;
+
+  if (!data || data.status !== 'ok') {
+    box.textContent = '← 左側で条件を入力して生成ボタンを押してください';
+    showToast('❌ 生成に失敗しました: ' + (data && data.message || '不明なエラー'), 'error', 7000);
+    return;
+  }
+
   box.classList.remove('empty');
-  box.textContent = prompt;
-
+  box.textContent = data.generated;
   document.getElementById('copyBtn').style.display = 'inline-flex';
-  document.getElementById('openGeminiBtn').style.display = 'inline-flex';
-  document.getElementById('geminiGuide').style.display = 'flex';
-  document.getElementById('resultSection').style.display = 'flex';
+
+  // スプレッドシートへ自動保存
+  const refIds = data.refUsed ? String(data.refUsed) : (selectedRef ? String(selectedRef.id) : '');
+  const saveData = await callGAS({
+    action:      'saveHistory',
+    targetAI:    encodeURIComponent(targetAI),
+    requirement: encodeURIComponent(requirement),
+    generated:   encodeURIComponent(data.generated),
+    refIds:      encodeURIComponent(refIds)
+  });
+
+  if (saveData && saveData.status === 'ok') {
+    showToast('✅ 生成が完了し、スプレッドシートに自動保存しました', 'success');
+  } else {
+    showToast('⚠️ 生成は完了しましたが、スプレッドシートへの保存に失敗しました', 'error');
+  }
+
+  openStopServerModal();
 }
 
 function copyGenerated() {
   const text = document.getElementById('generatedPromptBox').textContent;
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
-    showToast('✅ プロンプトをコピーしました！Geminiに貼り付けてください', 'success');
+    showToast('✅ プロンプトをコピーしました', 'success');
   });
 }
 
-function openGemini() {
-  window.open('https://gemini.google.com/app', '_blank');
+// ============================================================
+// ローカル生成サーバーの停止確認モーダル
+// ============================================================
+function openStopServerModal() {
+  document.getElementById('stopServerModal').classList.add('open');
 }
 
-async function saveResult() {
-  const targetAI    = document.getElementById('targetAI').value;
-  const requirement = document.getElementById('userRequirement').value.trim();
-  const generated   = document.getElementById('geminiResult').value.trim();
+function closeStopServerModal() {
+  document.getElementById('stopServerModal').classList.remove('open');
+}
 
-  if (!generated) {
-    showToast('⚠️ Geminiの回答を貼り付けてください', 'error');
-    return;
-  }
-
-  const refIds = selectedRef ? String(selectedRef.id) : '';
-  const data = await callGAS({
-    action:      'saveHistory',
-    targetAI:    encodeURIComponent(targetAI),
-    requirement: encodeURIComponent(requirement),
-    generated:   encodeURIComponent(generated),
-    refIds:      encodeURIComponent(refIds)
-  });
-
-  if (data && data.status === 'ok') {
-    showToast('✅ スプレッドシートに保存しました！', 'success');
-    document.getElementById('geminiResult').value = '';
-  } else {
-    showToast('❌ 保存に失敗しました', 'error');
+async function confirmStopServer() {
+  closeStopServerModal();
+  try {
+    await fetch(LOCAL_SERVER_URL + '/shutdown', { method: 'POST' });
+    showToast('🛑 ローカル生成サーバーを停止しました', 'success');
+  } catch (e) {
+    showToast('⚠️ 停止リクエストに失敗しました（既に停止している可能性があります）', 'error');
   }
 }
 
@@ -1438,6 +1513,7 @@ async function loadStats() {
 // ============================================================
 function openSettings() {
   document.getElementById('gasUrl').value = GAS_URL;
+  document.getElementById('localServerUrl').value = LOCAL_SERVER_URL;
   renderPhraseList();
   document.getElementById('settingsModal').classList.add('open');
 }
@@ -1448,8 +1524,10 @@ function closeSettings() {
 
 function saveSettings() {
   GAS_URL = document.getElementById('gasUrl').value.trim();
+  LOCAL_SERVER_URL = document.getElementById('localServerUrl').value.trim() || 'http://localhost:5678';
   const pageSize = document.getElementById('pageSizeSetting').value;
   localStorage.setItem('chapro_gas_url', GAS_URL);
+  localStorage.setItem('chapro_local_server', LOCAL_SERVER_URL);
   localStorage.setItem('chapro_pagesize', pageSize);
 
   // 定型文を保存
@@ -1547,17 +1625,20 @@ function esc(str) {
 }
 
 let toastTimer;
-function showToast(msg, type) {
+function showToast(msg, type, duration) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show ' + (type || '');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3500);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); }, duration || 3500);
 }
 
 // モーダル外クリックで閉じる
 document.getElementById('detailModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeDetail();
+});
+document.getElementById('stopServerModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeStopServerModal();
 });
 document.getElementById('settingsModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeSettings();
