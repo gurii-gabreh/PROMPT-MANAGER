@@ -80,8 +80,10 @@ function buildMetaPrompt({ targetAI, requirement, candidates }) {
   p += `- プロンプト本文と使用例を含めること\n\n`;
   p += `## 出力形式（厳守・これ以外の前置きや説明文は一切書かないこと）\n`;
   p += `1行目：「REF_USED: <選んだ候補のID、無ければnone>」とだけ書く\n`;
-  p += `2行目：「---」とだけ書く\n`;
-  p += `3行目以降：以下の見出しに沿った本文\n`;
+  p += `2行目：「REF_REASON:」とだけ書く\n`;
+  p += `3行目以降：なぜその候補を選んだか（選ばなかった場合はなぜ参考プロンプト無しで作成したか）を、「- 」で始まる箇条書きで1〜3行\n`;
+  p += `箇条書きの直後に「---」とだけ書く\n`;
+  p += `その後：以下の見出しに沿った本文\n`;
   p += `【プロンプトタイトル】\n【プロンプト本文】\n【使い方・使用例】\n【期待できる効果】\n`;
   return p;
 }
@@ -134,15 +136,26 @@ function runClaude(promptText) {
 function parseClaudeOutput(raw) {
   const lines = raw.replace(/\r\n/g, '\n').split('\n');
   let refUsed = null;
-  let bodyStartIdx = 0;
+  let refReasons = [];
+  let idx = 0;
 
-  if (lines[0] && lines[0].trim().toUpperCase().startsWith('REF_USED:')) {
-    const val = lines[0].split(':').slice(1).join(':').trim();
+  if (lines[idx] && lines[idx].trim().toUpperCase().startsWith('REF_USED:')) {
+    const val = lines[idx].split(':').slice(1).join(':').trim();
     refUsed = (val && val.toLowerCase() !== 'none' && val !== 'なし') ? val : null;
-    bodyStartIdx = (lines[1] && lines[1].trim() === '---') ? 2 : 1;
+    idx++;
+
+    if (lines[idx] && lines[idx].trim().toUpperCase().startsWith('REF_REASON:')) {
+      idx++;
+      while (lines[idx] && lines[idx].trim().startsWith('-')) {
+        refReasons.push(lines[idx].trim().replace(/^-\s*/, ''));
+        idx++;
+      }
+    }
+
+    if (lines[idx] && lines[idx].trim() === '---') idx++;
   }
 
-  return { refUsed, generated: lines.slice(bodyStartIdx).join('\n').trim() };
+  return { refUsed, refReasons, generated: lines.slice(idx).join('\n').trim() };
 }
 
 // ============================================================
@@ -168,8 +181,17 @@ const server = http.createServer(async (req, res) => {
       }
       const promptText = buildMetaPrompt(body);
       const raw = await runClaude(promptText);
-      const { refUsed, generated } = parseClaudeOutput(raw);
-      return sendJson(res, 200, { status: 'ok', generated, refUsed });
+      const { refUsed, refReasons, generated } = parseClaudeOutput(raw);
+      const matched = Array.isArray(body.candidates)
+        ? body.candidates.find(c => String(c.id) === String(refUsed))
+        : null;
+      return sendJson(res, 200, {
+        status: 'ok',
+        generated,
+        refUsed,
+        refUsedTitle: matched ? matched.title : null,
+        refReasons
+      });
     } catch (e) {
       return sendJson(res, 500, { status: 'error', message: String(e && e.message || e) });
     }

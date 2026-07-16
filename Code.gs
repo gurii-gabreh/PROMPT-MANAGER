@@ -65,6 +65,13 @@ function doGet(e) {
   }
 }
 
+// saveHistory等、本文が長くGETのURL長制限に収まらないリクエスト用。
+// application/x-www-form-urlencoded のPOSTボディは e.parameter に
+// GETのクエリパラメータと同じ形で入るため、doGetと全く同じ処理を流用できる。
+function doPost(e) {
+  return doGet(e);
+}
+
 function buildResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))

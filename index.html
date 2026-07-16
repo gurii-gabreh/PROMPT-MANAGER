@@ -906,8 +906,17 @@
             ← 左側で条件を入力して生成ボタンを押してください
           </div>
 
+          <!-- 参考にしたプロンプトの補足 -->
+          <div id="refSummaryBox" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:12px;color:var(--text2);line-height:1.7;">
+            <div style="color:var(--text);font-weight:600;margin-bottom:6px;">🔎 AIが参考にしたプロンプト</div>
+            <div id="refSummaryTitle" style="color:var(--accent2);font-weight:600;margin-bottom:8px;"></div>
+            <div style="color:var(--text);font-weight:600;margin-bottom:4px;">選定理由</div>
+            <ul id="refSummaryReasons" style="padding-left:18px;margin:0;"></ul>
+          </div>
+
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-secondary" onclick="copyGenerated()" id="copyBtn" style="display:none;">📋 コピー</button>
+            <button class="btn btn-green" onclick="recordHistory()" id="recordBtn" style="display:none;">📝 履歴記録</button>
           </div>
         </div>
 
@@ -1068,6 +1077,23 @@ async function callGAS(params) {
   const url = GAS_URL + '?' + qs;
   try {
     const res = await fetch(url);
+    return await res.json();
+  } catch (e) {
+    showToast('❌ 通信エラー: ' + e.message, 'error');
+    return null;
+  }
+}
+
+// 生成プロンプト本文など、URLの長さ上限を超えうるデータを送る場合はPOSTを使う。
+// application/x-www-form-urlencoded で送るとGAS側は doGet と同じ e.parameter で受け取れる
+// （プリフライトも発生しないシンプルリクエストのため、Code.gs側の変更を最小限にできる）。
+async function callGASPost(params) {
+  if (!GAS_URL) {
+    showToast('⚠️ GAS URLが設定されていません。設定ボタンから入力してください。', 'error');
+    return null;
+  }
+  try {
+    const res = await fetch(GAS_URL, { method: 'POST', body: new URLSearchParams(params) });
     return await res.json();
   } catch (e) {
     showToast('❌ 通信エラー: ' + e.message, 'error');
@@ -1351,6 +1377,9 @@ async function generatePrompt() {
   const box = document.getElementById('generatedPromptBox');
   box.classList.add('empty');
   box.textContent = '生成中...ローカルのclaude CLIで処理しています';
+  document.getElementById('refSummaryBox').style.display = 'none';
+  document.getElementById('recordBtn').style.display = 'none';
+  lastGeneration = null;
 
   const online = await checkLocalServer();
   if (!online) {
@@ -1394,24 +1423,67 @@ async function generatePrompt() {
   box.classList.remove('empty');
   box.textContent = data.generated;
   document.getElementById('copyBtn').style.display = 'inline-flex';
+  document.getElementById('recordBtn').style.display = 'inline-flex';
 
-  // スプレッドシートへ自動保存
-  const refIds = data.refUsed ? String(data.refUsed) : (selectedRef ? String(selectedRef.id) : '');
-  const saveData = await callGAS({
+  // 参考にしたプロンプトを補足表示
+  const matchedCandidate = data.refUsed ? candidates.find(c => String(c.id) === String(data.refUsed)) : null;
+  renderRefSummary(matchedCandidate, data.refReasons || []);
+
+  lastGeneration = {
+    targetAI, requirement,
+    generated: data.generated,
+    refTitle: matchedCandidate ? matchedCandidate.title : null,
+    refBody:  matchedCandidate ? matchedCandidate.body  : null
+  };
+
+  showToast('✅ 生成が完了しました。内容を確認して「履歴記録」で保存してください', 'success');
+  openStopServerModal();
+}
+
+function renderRefSummary(candidate, reasons) {
+  const box = document.getElementById('refSummaryBox');
+  document.getElementById('refSummaryTitle').textContent = candidate ? candidate.title : '（参考プロンプトなしで作成）';
+  const list = document.getElementById('refSummaryReasons');
+  list.innerHTML = '';
+  if (reasons.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = '(理由の記載なし)';
+    list.appendChild(li);
+  } else {
+    reasons.forEach(r => {
+      const li = document.createElement('li');
+      li.textContent = r;
+      list.appendChild(li);
+    });
+  }
+  box.style.display = 'block';
+}
+
+let lastGeneration = null;
+
+async function recordHistory() {
+  if (!lastGeneration) return;
+  const recordBtn = document.getElementById('recordBtn');
+  recordBtn.disabled = true;
+
+  const refText = lastGeneration.refTitle
+    ? `${lastGeneration.refTitle}\n\n${lastGeneration.refBody || ''}`
+    : '（参考プロンプトなし）';
+
+  const data = await callGASPost({
     action:      'saveHistory',
-    targetAI:    encodeURIComponent(targetAI),
-    requirement: encodeURIComponent(requirement),
-    generated:   encodeURIComponent(data.generated),
-    refIds:      encodeURIComponent(refIds)
+    targetAI:    encodeURIComponent(lastGeneration.targetAI),
+    requirement: encodeURIComponent(lastGeneration.requirement),
+    generated:   encodeURIComponent(lastGeneration.generated),
+    refIds:      encodeURIComponent(refText)
   });
 
-  if (saveData && saveData.status === 'ok') {
-    showToast('✅ 生成が完了し、スプレッドシートに自動保存しました', 'success');
+  recordBtn.disabled = false;
+  if (data && data.status === 'ok') {
+    showToast('✅ スプレッドシートに記録しました', 'success');
   } else {
-    showToast('⚠️ 生成は完了しましたが、スプレッドシートへの保存に失敗しました', 'error');
+    showToast('❌ 記録に失敗しました', 'error');
   }
-
-  openStopServerModal();
 }
 
 function copyGenerated() {
