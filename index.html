@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROMPT MANAGER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS変数 ===== */
+    :root {
+      --bg:        #0d1117;
+      --bg2:       #161b22;
+      --bg3:       #21262d;
+      --border:    #30363d;
+      --accent:    #7c3aed;
+      --accent2:   #a78bfa;
+      --green:     #22c55e;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --text:      #e6edf3;
+      --text2:     #8b949e;
+      --text3:     #58a6ff;
+      --radius:    10px;
+      --font:      'Noto Sans JP', sans-serif;
+      --mono:      'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ===== ヘッダー ===== */
+    .header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      font-family: var(--mono);
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .logo-sub {
+      font-size: 10px;
+      color: var(--text2);
+      display: block;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stat-badge {
+      font-size: 12px;
+      color: var(--text2);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-family: var(--mono);
+    }
+
+    .stat-badge span {
+      color: var(--accent2);
+      font-weight: 600;
+    }
+
+    /* ===== 設定ボタン ===== */
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+    .btn-icon:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    /* ===== タブナビゲーション ===== */
+    .tab-nav {
+      display: flex;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      padding: 12px 20px;
+      background: none;
+      border: none;
+      color: var(--text2);
+      cursor: pointer;
+      font-size: 13px;
+      font-family: var(--font);
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn.active {
+      color: var(--accent2);
+      border-bottom-color: var(--accent2);
+    }
+
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    /* ===== メインコンテンツ ===== */
+    .main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ===== 検索バー ===== */
+    .search-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 16px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus { border-color: var(--accent2); }
+    .search-input::placeholder { color: var(--text2); }
+
+    .category-select {
+      padding: 10px 16px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font);
+      outline: none;
+      cursor: pointer;
+      min-width: 160px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: var(--font);
+      font-weight: 500;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #6d28d9; }
+
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    .btn-green {
+      background: #166534;
+      color: var(--green);
+      border: 1px solid #16a34a;
+    }
+    .btn-green:hover { background: #14532d; }
+
+    /* ===== プロンプトカード ===== */
+    .prompt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 12px;
+    }
+
+    .prompt-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .prompt-card:hover {
+      border-color: var(--accent2);
+      transform: translateY(-1px);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    .card-id {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text2);
+      white-space: nowrap;
+    }
+
+    .category-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--accent2);
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text2);
+    }
+
+    /* ===== ページネーション ===== */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .page-info {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    /* ===== 詳細モーダル ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 760px;
+      margin: auto;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      color: var(--text2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+
+    .modal-close:hover { color: var(--red); border-color: var(--red); }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.4;
+      padding-right: 40px;
+    }
+
+    .modal-meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .modal-body-label {
+      font-size: 12px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: var(--mono);
+    }
+
+    .prompt-body-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      color: #c9d1d9;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* ===== プロンプト生成モード ===== */
+    .gen-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 700px) {
+      .gen-layout { grid-template-columns: 1fr; }
+    }
+
+    .gen-section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-num {
+      width: 22px;
+      height: 22px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font);
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+      line-height: 1.6;
+    }
+
+    textarea:focus { border-color: var(--accent2); }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus { border-color: var(--accent2); }
+
+    /* ===== 生成プロンプト表示ボックス ===== */
+    .gen-prompt-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 13px;
+      font-family: var(--mono);
+      line-height: 1.7;
+      white-space: pre-wrap;
+      min-height: 200px;
+      max-height: 350px;
+      overflow-y: auto;
+      color: #c9d1d9;
+    }
+
+    .gen-prompt-box.empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text2);
+      font-size: 13px;
+      font-family: var(--font);
+    }
+
+    /* ===== 結果貼り付けエリア ===== */
+    .result-section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    /* ===== 履歴テーブル ===== */
+    .history-table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      background: var(--bg3);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 12px;
+      color: var(--text2);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .td-truncate {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== 設定モーダル ===== */
+    .settings-modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 520px;
+      margin: auto;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+    }
+
+    .settings-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .settings-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .settings-label {
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    /* ===== ステータス・トースト ===== */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 20px;
+      font-size: 13px;
+      z-index: 999;
+      transform: translateY(100px);
+      transition: transform 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast.show { transform: translateY(0); }
+    .toast.success { border-color: var(--green); }
+    .toast.error { border-color: var(--red); }
+
+    /* ===== ローディング ===== */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+      color: var(--text2);
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== 空状態 ===== */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text2);
+    }
+
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state p { font-size: 14px; line-height: 1.8; }
+
+    /* ===== 参照プロンプト選択 ===== */
+    .ref-prompt-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .ref-prompt-item {
+      padding: 8px 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ref-prompt-item:hover { border-color: var(--accent2); }
+    .ref-prompt-item.selected { border-color: var(--accent2); background: rgba(124,58,237,0.1); }
+
+    /* ===== Gemini誘導ボックス ===== */
+    .gemini-guide {
+      background: rgba(124,58,237,0.08);
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .gemini-guide-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gemini-guide-steps {
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 2;
+    }
+
+    .gemini-guide-steps span {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 50%;
+      text-align: center;
+      line-height: 18px;
+      font-size: 10px;
+      font-weight: 700;
+      color: white;
+      margin-right: 6px;
+    }
+
+    /* ===== 定型文ボタン ===== */
+    .phrase-area {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .phrase-area-label {
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .phrase-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phrase-btn {
+      padding: 5px 12px;
+      background: rgba(124,58,237,0.1);
+      border: 1px solid rgba(124,58,237,0.35);
+      border-radius: 20px;
+      color: var(--accent2);
+      font-size: 12px;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+
+    .phrase-btn:hover {
+      background: rgba(124,58,237,0.25);
+      border-color: var(--accent2);
+    }
+
+    /* ===== 設定モーダル内 定型文リスト ===== */
+    .phrase-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .phrase-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .phrase-row input {
+      font-size: 12px;
+      padding: 7px 10px;
+    }
+
+    .btn-del {
+      width: 28px;
+      height: 28px;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 6px;
+      color: var(--red);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .btn-del:hover { background: rgba(239,68,68,0.25); }
+
+    /* ===== レスポンシブ ===== */
+    @media (max-width: 600px) {
+      .header { padding: 0 14px; }
+      .main { padding: 14px; }
+      .tab-btn { padding: 10px 14px; font-size: 12px; }
+      .prompt-grid { grid-template-columns: 1fr; }
+      .stat-badge { display: none; }
+      .toast { left: 14px; right: 14px; bottom: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== ヘッダー ===== -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">CP</div>
+    <div class="logo-text">
+      PROMPT MANAGER
+      <span class="logo-sub">プロンプト管理 & 生成アシスト</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="stat-badge" id="statBadge">取得中...</div>
+    <button class="btn-icon" onclick="openSettings()" title="設定">⚙️</button>
+  </div>
+</header>
+
+<!-- ===== タブナビゲーション ===== -->
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('list', this)">📋 プロンプト一覧</button>
+  <button class="tab-btn" onclick="switchTab('generate', this)">✨ プロンプト生成</button>
+  <button class="tab-btn" onclick="switchTab('history', this)">📜 生成履歴</button>
+</nav>
+
+<!-- ===== メインコンテンツ ===== -->
+<main class="main">
+
+  <!-- ① プロンプト一覧タブ -->
+  <div class="tab-panel active" id="tab-list">
+    <div class="search-bar">
+      <input class="search-input" type="text" id="searchKeyword" placeholder="🔍 タイトル・本文でキーワード検索..." oninput="debounceSearch()">
+      <select class="category-select" id="categoryFilter" onchange="loadPrompts(1)">
+        <option value="">すべてのカテゴリ</option>
+      </select>
+      <button class="btn btn-secondary" onclick="loadPrompts(1)">検索</button>
+      <button class="btn btn-secondary" onclick="clearSearch()">クリア</button>
+    </div>
+
+    <div id="promptList">
+      <div class="loading"><div class="spinner"></div>プロンプトを読み込み中...</div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- ② プロンプト生成タブ -->
+  <div class="tab-panel" id="tab-generate">
+    <div class="gen-layout">
+      <!-- 左カラム：入力 -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <div class="gen-section">
+          <div class="section-title"><div class="step-num">1</div>対象AIを選択</div>
+          <div>
+            <label>どのAIに使うプロンプトを生成しますか？</label>
+            <select id="targetAI">
+              <option value="Gemini">Gemini</option>
+              <option value="ChatGPT">ChatGPT</option>
+              <option value="Claude">Claude</option>
+              <option value="Copilot">Microsoft Copilot</option>
+              <option value="Perplexity">Perplexity</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="gen-section">
+          <div class="section-title"><div class="step-num">2</div>やりたいことを入力</div>
+          <div>
+            <label>目的・要件（日本語で自由に記入）</label>
+            <textarea id="userRequirement" rows="5" placeholder="例：Instagramの集客投稿を作りたい。ターゲットは30代女性で、美容系サロンの告知用。ハッシュタグも付けてほしい。"></textarea>
+          </div>
+          <div class="phrase-area" id="phraseArea" style="display:none;">
+            <div class="phrase-area-label">📌 定型文（クリックで先頭に挿入）</div>
+            <div class="phrase-buttons" id="phraseButtons"></div>
+          </div>
+        </div>
+
+        <div class="gen-section">
+          <div class="section-title"><div class="step-num">3</div>参考プロンプトを選択（任意）</div>
+          <div>
+            <label>chapro.jpのプロンプトを参考にする場合は選択</label>
+            <input type="text" id="refSearch" placeholder="🔍 参考プロンプトを検索..." oninput="filterRefPrompts()" style="margin-bottom:8px;">
+            <div class="ref-prompt-list" id="refPromptList">
+              <div style="color:var(--text2);font-size:12px;padding:8px;">プロンプト一覧を読み込んでください</div>
+            </div>
+          </div>
+          <div id="selectedRefInfo" style="display:none;">
+            <div style="font-size:12px;color:var(--text2);">選択中：</div>
+            <div id="selectedRefTitle" style="font-size:13px;color:var(--accent2);font-weight:600;"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="generatePrompt()" style="padding:14px;">
+          ✨ Gemini用プロンプトを生成する
+        </button>
+      </div>
+
+      <!-- 右カラム：生成結果 -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <div class="gen-section" style="flex:1;">
+          <div class="section-title"><div class="step-num">4</div>生成されたGemini用プロンプト</div>
+
+          <div class="gen-prompt-box empty" id="generatedPromptBox">
+            ← 左側で条件を入力して生成ボタンを押してください
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="copyGenerated()" id="copyBtn" style="display:none;">📋 コピー</button>
+            <button class="btn btn-secondary" onclick="openGemini()" id="openGeminiBtn" style="display:none;">🌐 Geminiを開く</button>
+          </div>
+
+          <!-- Gemini誘導ガイド -->
+          <div class="gemini-guide" id="geminiGuide" style="display:none;">
+            <div class="gemini-guide-title">🤖 Geminiでの手順</div>
+            <div class="gemini-guide-steps">
+              <div><span>1</span>上の「コピー」ボタンでプロンプトをコピー</div>
+              <div><span>2</span>「Geminiを開く」でGeminiの新しいウィンドウを開く</div>
+              <div><span>3</span>Geminiにプロンプトを貼り付けて送信</div>
+              <div><span>4</span>Geminiの回答を下の「結果貼り付け」に貼り付けて保存</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 結果貼り付けセクション -->
+        <div class="gen-section" id="resultSection" style="display:none;">
+          <div class="section-title"><div class="step-num">5</div>Geminiの回答を貼り付け</div>
+          <div>
+            <label>Geminiが生成したプロンプトをここに貼り付けてください</label>
+            <textarea id="geminiResult" rows="6" placeholder="Geminiの回答をここに貼り付け..."></textarea>
+          </div>
+          <button class="btn btn-green" onclick="saveResult()">💾 スプレッドシートに保存</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 生成履歴タブ -->
+  <div class="tab-panel" id="tab-history">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div style="font-size:13px;color:var(--text2);">スプレッドシートに保存した生成履歴</div>
+      <button class="btn btn-secondary" onclick="loadHistory()">🔄 最新に更新</button>
+    </div>
+    <div id="historyContent">
+      <div class="loading"><div class="spinner"></div>履歴を読み込み中...</div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ===== 詳細モーダル ===== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeDetail()">✕</button>
+    <div class="modal-title" id="detailTitle"></div>
+    <div class="modal-meta" id="detailMeta"></div>
+    <div>
+      <div class="modal-body-label">プロンプト本文</div>
+      <div class="prompt-body-box" id="detailBody"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="copyDetail()">📋 本文をコピー</button>
+      <button class="btn btn-primary" onclick="useAsRef()">✨ 参考プロンプトに使う</button>
+      <a class="btn btn-secondary" id="detailLink" href="#" target="_blank">🔗 元サイトを見る</a>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 設定モーダル ===== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="settings-modal">
+    <button class="modal-close" onclick="closeSettings()">✕</button>
+    <div class="settings-title">⚙️ 設定</div>
+
+    <div class="settings-group">
+      <div class="settings-label">GAS Web App URL</div>
+      <input type="text" id="gasUrl" placeholder="https://script.google.com/macros/s/..." style="font-size:12px;font-family:var(--mono);">
+      <div style="font-size:11px;color:var(--text2);">GASのデプロイで生成されたURLを入力してください</div>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-label">1ページあたりの表示件数</div>
+      <select id="pageSizeSetting">
+        <option value="20">20件</option>
+        <option value="50" selected>50件</option>
+        <option value="100">100件</option>
+      </select>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-label" style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px;">📌 定型文管理</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">タイトルと内容を登録。生成タブでボタンとして表示され、クリックすると「やりたいこと」欄の先頭に挿入されます。</div>
+      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-bottom:6px;">
+        <div style="font-size:11px;color:var(--text2);padding:0 4px;">タイトル</div>
+        <div style="font-size:11px;color:var(--text2);padding:0 4px;">内容</div>
+        <div></div>
+      </div>
+      <div class="phrase-list" id="phraseList"></div>
+      <button class="btn btn-secondary" onclick="addPhraseRow()" style="margin-top:8px;width:100%;font-size:12px;">＋ 定型文を追加</button>
+    </div>
+
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:12px;color:var(--text2);line-height:1.8;">
+      <div style="color:var(--text);font-weight:600;margin-bottom:6px;">📋 初回セットアップ手順</div>
+      <div>1. GASエディタでCode.gsを貼り付け</div>
+      <div>2. <code style="background:var(--bg);padding:1px 4px;border-radius:4px;">setup()</code> 関数を実行（スプレッドシート自動作成）</div>
+      <div>3. Web Appとしてデプロイ（全員アクセス可）</div>
+      <div>4. 生成されたURLをここに入力</div>
+      <div>5. <code style="background:var(--bg);padding:1px 4px;border-radius:4px;">manualFetch()</code> で初回データ取得</div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeSettings()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== トースト通知 ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// 状態管理
+// ============================================================
+let GAS_URL      = localStorage.getItem('chapro_gas_url') || '';
+let currentPage  = 1;
+let totalPages   = 1;
+let allPrompts   = []; // 参照用プロンプト一覧（全件）
+let selectedRef  = null; // 選択中の参照プロンプト
+
+// ============================================================
+// 初期化
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  const savedPageSize = localStorage.getItem('chapro_pagesize');
+  if (savedPageSize) {
+    document.getElementById('pageSizeSetting').value = savedPageSize;
+  }
+  loadStats();
+  loadPrompts(1);
+  renderPhraseButtons(); // 定型文ボタン初期表示
+});
+
+// ============================================================
+// タブ切り替え
+// ============================================================
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+
+  if (name === 'generate') loadRefPrompts();
+  if (name === 'history')  loadHistory();
+}
+
+// ============================================================
+// API呼び出し共通
+// ============================================================
+async function callGAS(params) {
+  if (!GAS_URL) {
+    showToast('⚠️ GAS URLが設定されていません。設定ボタンから入力してください。', 'error');
+    return null;
+  }
+  const qs = new URLSearchParams(params).toString();
+  const url = GAS_URL + '?' + qs;
+  try {
+    const res = await fetch(url);
+    return await res.json();
+  } catch (e) {
+    showToast('❌ 通信エラー: ' + e.message, 'error');
+    return null;
+  }
+}
+
+// ============================================================
+// プロンプト一覧
+// ============================================================
+let searchDebounce;
+function debounceSearch() {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => loadPrompts(1), 400);
+}
+
+function clearSearch() {
+  document.getElementById('searchKeyword').value = '';
+  document.getElementById('categoryFilter').value = '';
+  loadPrompts(1);
+}
+
+async function loadPrompts(page) {
+  currentPage = page;
+  const keyword    = document.getElementById('searchKeyword').value;
+  const category   = document.getElementById('categoryFilter').value;
+  const pageSize   = localStorage.getItem('chapro_pagesize') || '50';
+
+  document.getElementById('promptList').innerHTML =
+    '<div class="loading"><div class="spinner"></div>読み込み中...</div>';
+  document.getElementById('pagination').innerHTML = '';
+
+  const data = await callGAS({ action: 'getPrompts', keyword, category, page, pageSize });
+  if (!data) {
+    document.getElementById('promptList').innerHTML =
+      '<div class="empty-state"><div class="icon">⚠️</div><p>GAS URLを設定してください</p></div>';
+    return;
+  }
+  if (data.status !== 'ok') {
+    document.getElementById('promptList').innerHTML =
+      '<div class="empty-state"><div class="icon">❌</div><p>' + (data.message || 'エラー') + '</p></div>';
+    return;
+  }
+
+  // カテゴリ選択肢を更新
+  if (data.categories && data.categories.length > 0) {
+    const sel = document.getElementById('categoryFilter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">すべてのカテゴリ</option>';
+    data.categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      if (c === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  // カード表示
+  if (!data.data || data.data.length === 0) {
+    document.getElementById('promptList').innerHTML =
+      '<div class="empty-state"><div class="icon">🔍</div><p>プロンプトが見つかりませんでした</p></div>';
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'prompt-grid';
+  data.data.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'prompt-card';
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-title">${esc(p.title)}</div>
+        <div class="card-id">#${p.id}</div>
+      </div>
+      <div><span class="category-tag">${esc(p.category)}</span></div>
+      <div class="card-desc">${esc(p.description || p.body || '')}</div>
+      <div class="card-meta">
+        <span>👤 ${esc(p.author || '不明')}</span>
+        <span>📅 ${esc(p.date || '')}</span>
+      </div>
+    `;
+    card.onclick = () => openDetail(p);
+    grid.appendChild(card);
+  });
+  document.getElementById('promptList').innerHTML = '';
+  document.getElementById('promptList').appendChild(grid);
+
+  // ページネーション
+  totalPages = Math.ceil(data.total / parseInt(pageSize));
+  renderPagination(data.total, parseInt(pageSize));
+}
+
+function renderPagination(total, pageSize) {
+  const pag = document.getElementById('pagination');
+  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+
+  pag.innerHTML = '';
+  const info = document.createElement('span');
+  info.className = 'page-info';
+  info.textContent = `${total}件中 ${(currentPage-1)*pageSize+1}〜${Math.min(currentPage*pageSize,total)}件表示`;
+  pag.appendChild(info);
+
+  if (currentPage > 1) {
+    const prev = document.createElement('button');
+    prev.className = 'btn btn-secondary';
+    prev.textContent = '← 前へ';
+    prev.onclick = () => loadPrompts(currentPage - 1);
+    pag.appendChild(prev);
+  }
+
+  // 前後2ページのみ表示
+  for (let p = Math.max(1, currentPage-2); p <= Math.min(totalPages, currentPage+2); p++) {
+    const btn = document.createElement('button');
+    btn.className = 'btn ' + (p === currentPage ? 'btn-primary' : 'btn-secondary');
+    btn.textContent = p;
+    btn.onclick = ((pg) => () => loadPrompts(pg))(p);
+    pag.appendChild(btn);
+  }
+
+  if (currentPage < totalPages) {
+    const next = document.createElement('button');
+    next.className = 'btn btn-secondary';
+    next.textContent = '次へ →';
+    next.onclick = () => loadPrompts(currentPage + 1);
+    pag.appendChild(next);
+  }
+}
+
+// ============================================================
+// 詳細モーダル
+// ============================================================
+let currentDetail = null;
+
+function openDetail(p) {
+  currentDetail = p;
+  document.getElementById('detailTitle').textContent = p.title;
+  document.getElementById('detailMeta').innerHTML = `
+    <span class="category-tag">${esc(p.category)}</span>
+    <span style="font-size:12px;color:var(--text2);">👤 ${esc(p.author || '不明')}</span>
+    <span style="font-size:12px;color:var(--text2);">📅 ${esc(p.date || '')}</span>
+    <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">#${p.id}</span>
+  `;
+  document.getElementById('detailBody').textContent = p.body || '（本文なし）';
+  document.getElementById('detailLink').href = p.url || '#';
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.remove('open');
+  currentDetail = null;
+}
+
+function copyDetail() {
+  if (!currentDetail) return;
+  navigator.clipboard.writeText(currentDetail.body || '').then(() => {
+    showToast('✅ 本文をコピーしました', 'success');
+  });
+}
+
+function useAsRef() {
+  if (!currentDetail) return;
+  selectedRef = currentDetail;
+  document.getElementById('selectedRefInfo').style.display = 'block';
+  document.getElementById('selectedRefTitle').textContent = currentDetail.title;
+  closeDetail();
+  switchTab('generate', document.querySelectorAll('.tab-btn')[1]);
+  showToast('✅ 参考プロンプトに設定しました', 'success');
+}
+
+// ============================================================
+// プロンプト生成モード
+// ============================================================
+async function loadRefPrompts() {
+  if (allPrompts.length > 0) {
+    renderRefList(allPrompts);
+    return;
+  }
+  document.getElementById('refPromptList').innerHTML =
+    '<div style="color:var(--text2);font-size:12px;padding:8px;">読み込み中...</div>';
+
+  const data = await callGAS({ action: 'getPrompts', pageSize: 500, page: 1 });
+  if (data && data.data) {
+    allPrompts = data.data;
+    renderRefList(allPrompts);
+  }
+}
+
+function renderRefList(list) {
+  const container = document.getElementById('refPromptList');
+  container.innerHTML = '';
+  list.slice(0, 100).forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'ref-prompt-item' + (selectedRef && selectedRef.id === p.id ? ' selected' : '');
+    item.innerHTML = `
+      <span>${esc(p.title)}</span>
+      <span style="color:var(--text2);font-size:11px;">${esc(p.category)}</span>
+    `;
+    item.onclick = () => selectRef(p, item);
+    container.appendChild(item);
+  });
+}
+
+function filterRefPrompts() {
+  const kw = document.getElementById('refSearch').value.toLowerCase();
+  const filtered = kw ? allPrompts.filter(p =>
+    p.title.toLowerCase().includes(kw) || (p.category || '').toLowerCase().includes(kw)
+  ) : allPrompts;
+  renderRefList(filtered);
+}
+
+function selectRef(p, el) {
+  selectedRef = p;
+  document.querySelectorAll('.ref-prompt-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('selectedRefInfo').style.display = 'block';
+  document.getElementById('selectedRefTitle').textContent = p.title;
+}
+
+function generatePrompt() {
+  const targetAI  = document.getElementById('targetAI').value;
+  const requirement = document.getElementById('userRequirement').value.trim();
+
+  if (!requirement) {
+    showToast('⚠️ 「やりたいこと」を入力してください', 'error');
+    return;
+  }
+
+  // Geminiに渡す指示プロンプトを生成
+  let prompt = '';
+  prompt += `# ${targetAI}向けプロンプト生成依頼\n\n`;
+  prompt += `## 依頼内容\n${requirement}\n\n`;
+
+  if (selectedRef) {
+    prompt += `## 参考プロンプト（chapro.jp より）\n`;
+    prompt += `タイトル：${selectedRef.title}\n`;
+    prompt += `カテゴリ：${selectedRef.category}\n`;
+    prompt += `本文：\n${selectedRef.body}\n\n`;
+    prompt += `上記の参考プロンプトの構成・スタイルを参考にしながら、以下の条件で新しいプロンプトを作成してください。\n\n`;
+  }
+
+  prompt += `## 作成条件\n`;
+  prompt += `- 対象AI：${targetAI}\n`;
+  prompt += `- 言語：日本語\n`;
+  prompt += `- ${targetAI}の特性（能力・制約・得意分野）を最大限に活かした内容にすること\n`;
+  prompt += `- 誰でも使いやすいよう、プロンプトの冒頭に使い方の簡単な説明を入れること\n`;
+  prompt += `- プロンプト本文と使用例を含めること\n\n`;
+  prompt += `## 出力形式\n`;
+  prompt += `【プロンプトタイトル】\n`;
+  prompt += `【プロンプト本文】\n`;
+  prompt += `【使い方・使用例】\n`;
+  prompt += `【期待できる効果】\n`;
+
+  // 表示
+  const box = document.getElementById('generatedPromptBox');
+  box.classList.remove('empty');
+  box.textContent = prompt;
+
+  document.getElementById('copyBtn').style.display = 'inline-flex';
+  document.getElementById('openGeminiBtn').style.display = 'inline-flex';
+  document.getElementById('geminiGuide').style.display = 'flex';
+  document.getElementById('resultSection').style.display = 'flex';
+}
+
+function copyGenerated() {
+  const text = document.getElementById('generatedPromptBox').textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✅ プロンプトをコピーしました！Geminiに貼り付けてください', 'success');
+  });
+}
+
+function openGemini() {
+  window.open('https://gemini.google.com/app', '_blank');
+}
+
+async function saveResult() {
+  const targetAI    = document.getElementById('targetAI').value;
+  const requirement = document.getElementById('userRequirement').value.trim();
+  const generated   = document.getElementById('geminiResult').value.trim();
+
+  if (!generated) {
+    showToast('⚠️ Geminiの回答を貼り付けてください', 'error');
+    return;
+  }
+
+  const refIds = selectedRef ? String(selectedRef.id) : '';
+  const data = await callGAS({
+    action:      'saveHistory',
+    targetAI:    encodeURIComponent(targetAI),
+    requirement: encodeURIComponent(requirement),
+    generated:   encodeURIComponent(generated),
+    refIds:      encodeURIComponent(refIds)
+  });
+
+  if (data && data.status === 'ok') {
+    showToast('✅ スプレッドシートに保存しました！', 'success');
+    document.getElementById('geminiResult').value = '';
+  } else {
+    showToast('❌ 保存に失敗しました', 'error');
+  }
+}
+
+// ============================================================
+// 生成履歴
+// ============================================================
+async function loadHistory() {
+  document.getElementById('historyContent').innerHTML =
+    '<div class="loading"><div class="spinner"></div>履歴を読み込み中...</div>';
+
+  const data = await callGAS({ action: 'getHistory' });
+  if (!data || !data.data) {
+    document.getElementById('historyContent').innerHTML =
+      '<div class="empty-state"><div class="icon">⚠️</div><p>履歴の取得に失敗しました</p></div>';
+    return;
+  }
+
+  if (data.data.length === 0) {
+    document.getElementById('historyContent').innerHTML =
+      '<div class="empty-state"><div class="icon">📜</div><p>まだ生成履歴がありません<br>プロンプト生成タブで生成して保存してください</p></div>';
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'history-table-wrap';
+  const table = document.createElement('table');
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>日時</th>
+        <th>対象AI</th>
+        <th>目的・要件</th>
+        <th>生成内容（抜粋）</th>
+        <th>参考ID</th>
+      </tr>
+    </thead>
+  `;
+  const tbody = document.createElement('tbody');
+  data.data.forEach(h => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="white-space:nowrap;font-size:11px;color:var(--text2);">${esc(h.datetime)}</td>
+      <td><span class="category-tag">${esc(h.targetAI)}</span></td>
+      <td class="td-truncate">${esc(h.requirement)}</td>
+      <td class="td-truncate">${esc((h.generated || '').substring(0, 80))}...</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text2);">${esc(h.refIds || '-')}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  document.getElementById('historyContent').innerHTML = '';
+  document.getElementById('historyContent').appendChild(wrap);
+}
+
+// ============================================================
+// 統計情報
+// ============================================================
+async function loadStats() {
+  const data = await callGAS({ action: 'getStats' });
+  if (data && data.status === 'ok') {
+    document.getElementById('statBadge').innerHTML =
+      `<span>${data.totalPrompts.toLocaleString()}</span>件 | 履歴 <span>${data.totalHistory}</span>件`;
+  } else {
+    document.getElementById('statBadge').textContent = '未接続';
+  }
+}
+
+// ============================================================
+// 設定
+// ============================================================
+function openSettings() {
+  document.getElementById('gasUrl').value = GAS_URL;
+  renderPhraseList();
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function saveSettings() {
+  GAS_URL = document.getElementById('gasUrl').value.trim();
+  const pageSize = document.getElementById('pageSizeSetting').value;
+  localStorage.setItem('chapro_gas_url', GAS_URL);
+  localStorage.setItem('chapro_pagesize', pageSize);
+
+  // 定型文を保存
+  savePhrases();
+
+  closeSettings();
+  showToast('✅ 設定を保存しました', 'success');
+  loadStats();
+  loadPrompts(1);
+  renderPhraseButtons(); // 生成タブのボタンを更新
+}
+
+// ============================================================
+// 定型文管理
+// ============================================================
+function loadPhrases() {
+  try {
+    return JSON.parse(localStorage.getItem('chapro_phrases') || '[]');
+  } catch { return []; }
+}
+
+function savePhrases() {
+  const rows = document.querySelectorAll('#phraseList .phrase-row');
+  const phrases = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const title   = inputs[0].value.trim();
+    const content = inputs[1].value.trim();
+    if (title && content) phrases.push({ title, content });
+  });
+  localStorage.setItem('chapro_phrases', JSON.stringify(phrases));
+}
+
+function renderPhraseList() {
+  const container = document.getElementById('phraseList');
+  container.innerHTML = '';
+  const phrases = loadPhrases();
+  phrases.forEach((p, i) => addPhraseRow(p.title, p.content));
+  if (phrases.length === 0) addPhraseRow(); // 空行1つ表示
+}
+
+function addPhraseRow(title, content) {
+  const container = document.getElementById('phraseList');
+  const row = document.createElement('div');
+  row.className = 'phrase-row';
+  row.innerHTML = `
+    <input type="text" placeholder="遵守事項" value="${esc(title || '')}">
+    <input type="text" placeholder="一語一句間違わずに理解すること" value="${esc(content || '')}">
+    <button class="btn-del" onclick="this.closest('.phrase-row').remove()" title="削除">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function renderPhraseButtons() {
+  const phrases = loadPhrases();
+  const area = document.getElementById('phraseArea');
+  const container = document.getElementById('phraseButtons');
+  container.innerHTML = '';
+
+  if (phrases.length === 0) {
+    area.style.display = 'none';
+    return;
+  }
+
+  area.style.display = 'flex';
+  phrases.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'phrase-btn';
+    btn.textContent = p.title;
+    btn.title = p.content;
+    btn.onclick = () => insertPhrase(p.title, p.content);
+    container.appendChild(btn);
+  });
+}
+
+function insertPhrase(title, content) {
+  const ta = document.getElementById('userRequirement');
+  const insert = title + '\n・' + content + '\n\n';
+  ta.value = insert + ta.value;
+  ta.focus();
+  ta.setSelectionRange(0, 0);
+  showToast(`✅「${title}」を先頭に挿入しました`, 'success');
+}
+
+// ============================================================
+// ユーティリティ
+// ============================================================
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3500);
+}
+
+// モーダル外クリックで閉じる
+document.getElementById('detailModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeDetail();
+});
+document.getElementById('settingsModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSettings();
+});
+</script>
+</body>
+</html>
