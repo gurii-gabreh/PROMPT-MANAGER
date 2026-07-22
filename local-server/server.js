@@ -57,7 +57,7 @@ function readJsonBody(req) {
 // ============================================================
 // claude CLI に渡すメタプロンプトを組み立てる
 // ============================================================
-function buildMetaPrompt({ targetAI, requirement, candidates }) {
+function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, detailText }) {
   let p = '';
   p += `あなたはプロのプロンプトエンジニアです。以下の依頼内容に基づき、${targetAI}向けの高品質なプロンプトを作成してください。\n\n`;
   p += `## 依頼内容\n${requirement}\n\n`;
@@ -77,7 +77,15 @@ function buildMetaPrompt({ targetAI, requirement, candidates }) {
   p += `- 言語：日本語\n`;
   p += `- ${targetAI}の特性（能力・制約・得意分野）を最大限に活かした内容にすること\n`;
   p += `- 誰でも使いやすいよう、プロンプトの冒頭に使い方の簡単な説明を入れること\n`;
-  p += `- プロンプト本文と使用例を含めること\n\n`;
+  p += `- プロンプト本文と使用例を含めること\n`;
+  if (expertiseText) {
+    p += `- 生成する【プロンプト本文】自体の説明・言い回しを、次の専門性レベルで書くこと：${expertiseText}\n`;
+    p += `  （さらに、このプロンプトを使ってAIに回答させる際も同じ専門性レベルで答えるよう、プロンプト内に明記すること）\n`;
+  }
+  if (detailText) {
+    p += `- このプロンプトを使ってAIに回答させる際の詳細度は次の水準にするよう、プロンプト内に明記すること：${detailText}\n`;
+  }
+  p += `\n`;
   p += `## 出力形式（厳守・これ以外の前置きや説明文は一切書かないこと）\n`;
   p += `1行目：「REF_USED: <選んだ候補のID、無ければnone>」とだけ書く\n`;
   p += `2行目：「REF_REASON:」とだけ書く\n`;

@@ -486,6 +486,31 @@
 
     select:focus, input[type="text"]:focus { border-color: var(--accent2); }
 
+    /* ===== レベル調整スライダー ===== */
+    .slider-group { margin-top: 14px; }
+    .slider-group-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 6px;
+    }
+    .slider-group-label .value {
+      color: var(--accent2);
+      font-weight: 600;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent2);
+    }
+    .slider-scale {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+
     /* ===== 生成プロンプト表示ボックス ===== */
     .gen-prompt-box {
       background: var(--bg);
@@ -871,6 +896,18 @@
           <div class="phrase-area" id="phraseArea" style="display:none;">
             <div class="phrase-area-label">📌 定型文（クリックで先頭に挿入）</div>
             <div class="phrase-buttons" id="phraseButtons"></div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-group-label"><span>専門性レベル</span><span class="value" id="expertiseLevelLabel">標準</span></div>
+            <input type="range" id="expertiseLevel" min="1" max="5" value="3" oninput="updateSliderLabel('expertiseLevel')">
+            <div class="slider-scale"><span>やさしく</span><span>専門的</span></div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-group-label"><span>回答の詳細度</span><span class="value" id="detailLevelLabel">標準</span></div>
+            <input type="range" id="detailLevel" min="1" max="5" value="3" oninput="updateSliderLabel('detailLevel')">
+            <div class="slider-scale"><span>ざっくり</span><span>精密</span></div>
           </div>
         </div>
 
@@ -1363,10 +1400,39 @@ async function checkLocalServer() {
   }
 }
 
+// ============================================================
+// 専門性／回答の詳細度スライダー
+// ============================================================
+const SLIDER_SCALE_LABELS = ['とてもやさしく', 'やさしめ', '標準', 'やや専門的', '専門的'];
+const DETAIL_SCALE_LABELS = ['ざっくり', 'やや簡潔', '標準', 'やや詳細', '精密・網羅的'];
+
+const EXPERTISE_PROMPT_TEXT = [
+  '専門用語を一切使わず、初心者にも分かるように徹底的にやさしく説明する',
+  'できるだけ平易な言葉を使い、専門用語を使う場合は簡単な補足を添える',
+  '一般的な社会人向けの標準的な説明にする',
+  'ある程度の前提知識がある人向けに、専門用語を交えて効率よく説明する',
+  '専門家向けに、専門用語や高度な内容を遠慮なく用いて簡潔に説明する'
+];
+const DETAIL_PROMPT_TEXT = [
+  '要点だけを簡潔に、ざっくり答える（詳細な説明は省く）',
+  'やや簡潔に、要点を中心にコンパクトに答える',
+  '標準的なバランスで、要点と補足説明を答える',
+  'やや詳しく、背景・理由・具体例も含めて答える',
+  '精密かつ網羅的に、詳細な根拠・手順・注意点まで含めて答える'
+];
+
+function updateSliderLabel(id) {
+  const val = parseInt(document.getElementById(id).value, 10);
+  const labels = (id === 'expertiseLevel') ? SLIDER_SCALE_LABELS : DETAIL_SCALE_LABELS;
+  document.getElementById(id + 'Label').textContent = labels[val - 1];
+}
+
 async function generatePrompt() {
   const targetAI     = document.getElementById('targetAI').value;
   const requirement  = document.getElementById('userRequirement').value.trim();
   const generateBtn  = document.getElementById('generateBtn');
+  const expertiseText = EXPERTISE_PROMPT_TEXT[parseInt(document.getElementById('expertiseLevel').value, 10) - 1];
+  const detailText     = DETAIL_PROMPT_TEXT[parseInt(document.getElementById('detailLevel').value, 10) - 1];
 
   if (!requirement) {
     showToast('⚠️ 「やりたいこと」を入力してください', 'error');
@@ -1402,7 +1468,7 @@ async function generatePrompt() {
     const res = await fetch(LOCAL_SERVER_URL + '/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetAI, requirement, candidates })
+      body: JSON.stringify({ targetAI, requirement, candidates, expertiseText, detailText })
     });
     data = await res.json();
   } catch (e) {
