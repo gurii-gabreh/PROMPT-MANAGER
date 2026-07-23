@@ -909,6 +909,22 @@
             <input type="range" id="detailLevel" min="1" max="5" value="3" oninput="updateSliderLabel('detailLevel')">
             <div class="slider-scale"><span>ざっくり</span><span>精密</span></div>
           </div>
+
+          <div class="slider-group">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0;">
+              <input type="checkbox" id="fullStructure" checked style="width:auto;">
+              <span style="font-size:12px;color:var(--text2);">タイトル・使い方・期待できる効果も含めた構成にする（オフにするとプロンプト本文だけのシンプルな出力）</span>
+            </label>
+          </div>
+
+          <div class="slider-group">
+            <button class="btn btn-secondary" onclick="askClarifyingQuestions()" id="questionsBtn" style="width:100%;">🤔 AIに質問してもらって設定する（時間があるとき）</button>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">時間がないときはこのステップを飛ばして、上のスライダーのまま生成してOKです</div>
+            <div id="questionWizard" style="display:none;margin-top:10px;">
+              <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">回答をクリックすると、上のスライダーが自動設定されます</div>
+              <div id="questionList"></div>
+            </div>
+          </div>
         </div>
 
         <div class="gen-section">
@@ -1427,12 +1443,106 @@ function updateSliderLabel(id) {
   document.getElementById(id + 'Label').textContent = labels[val - 1];
 }
 
+// ============================================================
+// AIによるレベル感の質問ウィザード（任意・時間があるときに使用）
+// ============================================================
+async function askClarifyingQuestions() {
+  const targetAI    = document.getElementById('targetAI').value;
+  const requirement = document.getElementById('userRequirement').value.trim();
+
+  if (!requirement) {
+    showToast('⚠️ 「やりたいこと」を入力してください', 'error');
+    return;
+  }
+
+  const online = await checkLocalServer();
+  if (!online) {
+    showToast(
+      '⚠️ ローカル生成サーバーに接続できません。Macでターミナルを起動してください（local-server フォルダで node server.js）',
+      'error', 7000
+    );
+    return;
+  }
+
+  const questionsBtn = document.getElementById('questionsBtn');
+  const originalLabel = questionsBtn.textContent;
+  questionsBtn.disabled = true;
+  questionsBtn.textContent = '質問を考え中...';
+
+  let data;
+  try {
+    const res = await fetch(LOCAL_SERVER_URL + '/questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetAI, requirement })
+    });
+    data = await res.json();
+  } catch (e) {
+    questionsBtn.disabled = false;
+    questionsBtn.textContent = originalLabel;
+    showToast('❌ 質問の取得に失敗しました: ' + e.message, 'error', 7000);
+    return;
+  }
+
+  questionsBtn.disabled = false;
+  questionsBtn.textContent = originalLabel;
+
+  if (!data || data.status !== 'ok' || !data.questions || data.questions.length === 0) {
+    showToast('❌ 質問の生成に失敗しました: ' + (data && data.message || '不明なエラー'), 'error', 7000);
+    return;
+  }
+
+  renderQuestionWizard(data.questions);
+}
+
+function renderQuestionWizard(questions) {
+  const list = document.getElementById('questionList');
+  list.innerHTML = '';
+  questions.forEach(q => {
+    const block = document.createElement('div');
+    block.style.marginBottom = '12px';
+
+    const qLabel = document.createElement('div');
+    qLabel.style.cssText = 'font-size:12px;color:var(--text);margin-bottom:6px;';
+    qLabel.textContent = q.question;
+    block.appendChild(qLabel);
+
+    const optWrap = document.createElement('div');
+    optWrap.className = 'phrase-buttons';
+    q.options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'phrase-btn';
+      btn.textContent = opt.text;
+      btn.onclick = () => applyQuestionAnswer(q.axis, opt.level, btn, optWrap);
+      optWrap.appendChild(btn);
+    });
+    block.appendChild(optWrap);
+    list.appendChild(block);
+  });
+  document.getElementById('questionWizard').style.display = 'block';
+}
+
+function applyQuestionAnswer(axis, level, clickedBtn, container) {
+  const sliderId = (axis === 'expertise') ? 'expertiseLevel' : 'detailLevel';
+  document.getElementById(sliderId).value = level;
+  updateSliderLabel(sliderId);
+  container.querySelectorAll('button').forEach(b => {
+    b.style.background = '';
+    b.style.borderColor = '';
+  });
+  clickedBtn.style.background = 'rgba(124,58,237,0.35)';
+  clickedBtn.style.borderColor = 'var(--accent2)';
+  showToast('✅ 回答に合わせてスライダーを設定しました', 'success');
+}
+
 async function generatePrompt() {
   const targetAI     = document.getElementById('targetAI').value;
   const requirement  = document.getElementById('userRequirement').value.trim();
   const generateBtn  = document.getElementById('generateBtn');
-  const expertiseText = EXPERTISE_PROMPT_TEXT[parseInt(document.getElementById('expertiseLevel').value, 10) - 1];
+  const expertiseText  = EXPERTISE_PROMPT_TEXT[parseInt(document.getElementById('expertiseLevel').value, 10) - 1];
   const detailText     = DETAIL_PROMPT_TEXT[parseInt(document.getElementById('detailLevel').value, 10) - 1];
+  const fullStructure  = document.getElementById('fullStructure').checked;
 
   if (!requirement) {
     showToast('⚠️ 「やりたいこと」を入力してください', 'error');
@@ -1468,7 +1578,7 @@ async function generatePrompt() {
     const res = await fetch(LOCAL_SERVER_URL + '/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetAI, requirement, candidates, expertiseText, detailText })
+      body: JSON.stringify({ targetAI, requirement, candidates, expertiseText, detailText, fullStructure })
     });
     data = await res.json();
   } catch (e) {

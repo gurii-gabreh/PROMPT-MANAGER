@@ -57,7 +57,7 @@ function readJsonBody(req) {
 // ============================================================
 // claude CLI に渡すメタプロンプトを組み立てる
 // ============================================================
-function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, detailText }) {
+function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, detailText, fullStructure }) {
   let p = '';
   p += `あなたはプロのプロンプトエンジニアです。以下の依頼内容に基づき、${targetAI}向けの高品質なプロンプトを作成してください。\n\n`;
   p += `## 依頼内容\n${requirement}\n\n`;
@@ -76,8 +76,12 @@ function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, det
   p += `- 対象AI：${targetAI}\n`;
   p += `- 言語：日本語\n`;
   p += `- ${targetAI}の特性（能力・制約・得意分野）を最大限に活かした内容にすること\n`;
-  p += `- 誰でも使いやすいよう、プロンプトの冒頭に使い方の簡単な説明を入れること\n`;
-  p += `- プロンプト本文と使用例を含めること\n`;
+  if (fullStructure) {
+    p += `- 誰でも使いやすいよう、プロンプトの冒頭に使い方の簡単な説明を入れること\n`;
+    p += `- プロンプト本文と使用例を含めること\n`;
+  } else {
+    p += `- 前置きや使い方の説明、使用例などは付けず、プロンプト本文だけをシンプルに作成すること\n`;
+  }
   if (expertiseText) {
     p += `- 生成する【プロンプト本文】自体の説明・言い回しを、次の専門性レベルで書くこと：${expertiseText}\n`;
     p += `  （さらに、このプロンプトを使ってAIに回答させる際も同じ専門性レベルで答えるよう、プロンプト内に明記すること）\n`;
@@ -91,9 +95,69 @@ function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, det
   p += `2行目：「REF_REASON:」とだけ書く\n`;
   p += `3行目以降：なぜその候補を選んだか（選ばなかった場合はなぜ参考プロンプト無しで作成したか）を、「- 」で始まる箇条書きで1〜3行\n`;
   p += `箇条書きの直後に「---」とだけ書く\n`;
-  p += `その後：以下の見出しに沿った本文\n`;
-  p += `【プロンプトタイトル】\n【プロンプト本文】\n【使い方・使用例】\n【期待できる効果】\n`;
+  if (fullStructure) {
+    p += `その後：以下の見出しに沿った本文\n`;
+    p += `【プロンプトタイトル】\n【プロンプト本文】\n【使い方・使用例】\n【期待できる効果】\n`;
+  } else {
+    p += `その後：見出しを付けず、プロンプト本文のみを出力すること\n`;
+  }
   return p;
+}
+
+// ============================================================
+// レベル感を判断するための質問（クリック回答式）をclaude CLIに作らせる
+// ============================================================
+function buildQuestionsPrompt({ targetAI, requirement }) {
+  let p = '';
+  p += `あなたはプロンプト設計のヒアリングを行うアシスタントです。\n`;
+  p += `以下の依頼内容をもとに、${targetAI}向けプロンプトを作る上で重要な\n`;
+  p += `「専門性レベル」と「回答の詳細度」を判断するための質問を、それぞれ1問ずつ、合計2問作成してください。\n`;
+  p += `質問・選択肢は依頼内容に即した具体的な言葉にすること（例：読み手が誰か、何のために使うか等）。\n\n`;
+  p += `## 依頼内容\n${requirement}\n\n`;
+  p += `## 出力形式（厳守・これ以外の前置きや説明文は一切書かないこと）\n`;
+  p += `AXIS: expertise\n`;
+  p += `QUESTION: <質問文>\n`;
+  p += `OPTION: <選択肢文> | LEVEL:1\n`;
+  p += `OPTION: <選択肢文> | LEVEL:3\n`;
+  p += `OPTION: <選択肢文> | LEVEL:5\n`;
+  p += `---\n`;
+  p += `AXIS: detail\n`;
+  p += `QUESTION: <質問文>\n`;
+  p += `OPTION: <選択肢文> | LEVEL:1\n`;
+  p += `OPTION: <選択肢文> | LEVEL:3\n`;
+  p += `OPTION: <選択肢文> | LEVEL:5\n`;
+  p += `---\n`;
+  p += `LEVEL:1は「やさしく／ざっくり」、LEVEL:3は「標準」、LEVEL:5は「専門的／精密」に対応する。\n`;
+  return p;
+}
+
+function parseQuestions(raw) {
+  const blocks = raw.replace(/\r\n/g, '\n').split(/\n---\s*\n?/).map(b => b.trim()).filter(Boolean);
+  const questions = [];
+
+  blocks.forEach(block => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    let axis = null;
+    let question = null;
+    const options = [];
+
+    lines.forEach(line => {
+      if (/^AXIS:/i.test(line)) {
+        axis = line.split(':').slice(1).join(':').trim();
+      } else if (/^QUESTION:/i.test(line)) {
+        question = line.split(':').slice(1).join(':').trim();
+      } else if (/^OPTION:/i.test(line)) {
+        const m = line.match(/^OPTION:\s*(.+?)\s*\|\s*LEVEL:\s*(\d)/i);
+        if (m) options.push({ text: m[1].trim(), level: parseInt(m[2], 10) });
+      }
+    });
+
+    if (axis && question && options.length > 0) {
+      questions.push({ axis, question, options });
+    }
+  });
+
+  return questions;
 }
 
 // ============================================================
@@ -200,6 +264,21 @@ const server = http.createServer(async (req, res) => {
         refUsedTitle: matched ? matched.title : null,
         refReasons
       });
+    } catch (e) {
+      return sendJson(res, 500, { status: 'error', message: String(e && e.message || e) });
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/questions') {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.targetAI || !body.requirement) {
+        return sendJson(res, 400, { status: 'error', message: 'targetAI / requirement は必須です' });
+      }
+      const promptText = buildQuestionsPrompt(body);
+      const raw = await runClaude(promptText);
+      const questions = parseQuestions(raw);
+      return sendJson(res, 200, { status: 'ok', questions });
     } catch (e) {
       return sendJson(res, 500, { status: 'error', message: String(e && e.message || e) });
     }
