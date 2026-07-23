@@ -487,6 +487,14 @@
     select:focus, input[type="text"]:focus { border-color: var(--accent2); }
 
     /* ===== レベル調整スライダー ===== */
+    .level-widget {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+    }
     .slider-group { margin-top: 14px; }
     .slider-group-label {
       display: flex;
@@ -899,36 +907,46 @@
           </div>
 
           <div class="slider-group">
-            <div class="slider-group-label"><span>専門性レベル</span><span class="value" id="expertiseLevelLabel">標準</span></div>
-            <input type="range" id="expertiseLevel" min="1" max="5" value="3" oninput="updateSliderLabel('expertiseLevel')">
-            <div class="slider-scale"><span>やさしく</span><span>専門的</span></div>
-          </div>
-
-          <div class="slider-group">
-            <div class="slider-group-label"><span>回答の詳細度</span><span class="value" id="detailLevelLabel">標準</span></div>
-            <input type="range" id="detailLevel" min="1" max="5" value="3" oninput="updateSliderLabel('detailLevel')">
-            <div class="slider-scale"><span>ざっくり</span><span>精密</span></div>
-          </div>
-
-          <div class="slider-group">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0;">
               <input type="checkbox" id="fullStructure" checked style="width:auto;">
               <span style="font-size:12px;color:var(--text2);">タイトル・使い方・期待できる効果も含めた構成にする（オフにするとプロンプト本文だけのシンプルな出力）</span>
             </label>
           </div>
+        </div>
 
-          <div class="slider-group">
-            <button class="btn btn-secondary" onclick="askClarifyingQuestions()" id="questionsBtn" style="width:100%;">🤔 AIに質問してもらって設定する（時間があるとき）</button>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px;">時間がないときはこのステップを飛ばして、上のスライダーのまま生成してOKです</div>
-            <div id="questionWizard" style="display:none;margin-top:10px;">
-              <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">回答をクリックすると、上のスライダーが自動設定されます</div>
-              <div id="questionList"></div>
+        <div class="gen-section">
+          <div class="section-title"><div class="step-num">3</div>回答レベル設定</div>
+
+          <button class="btn btn-secondary" onclick="askClarifyingQuestions()" id="questionsBtn" style="width:100%;">AIによる回答レベル設定ボタン（任意設定）</button>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;margin-bottom:12px;">時間がないときはこのステップを飛ばして、下のスライダーのまま生成してOKです</div>
+          <div id="questionWizard" style="display:none;margin-bottom:12px;">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">回答をクリックすると、下のスライダーが自動設定されます</div>
+            <div id="questionList"></div>
+          </div>
+
+          <div class="level-widget">
+            <div class="slider-group" style="margin-top:0;">
+              <div class="slider-group-label"><span>専門性レベル</span><span class="value" id="expertiseLevelLabel">標準</span></div>
+              <input type="range" id="expertiseLevel" min="1" max="5" value="3" oninput="updateSliderLabel('expertiseLevel')">
+              <div class="slider-scale"><span>やさしく</span><span>専門的</span></div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-group-label"><span>回答の詳細度</span><span class="value" id="detailLevelLabel">標準</span></div>
+              <input type="range" id="detailLevel" min="1" max="5" value="3" oninput="updateSliderLabel('detailLevel')">
+              <div class="slider-scale"><span>ざっくり</span><span>精密</span></div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-group-label"><span>出力ボリューム目安</span><span class="value" id="volumeLevelLabel">標準</span></div>
+              <input type="range" id="volumeLevel" min="1" max="5" value="3" oninput="updateSliderLabel('volumeLevel')">
+              <div class="slider-scale"><span>短め</span><span>長め</span></div>
             </div>
           </div>
         </div>
 
         <div class="gen-section">
-          <div class="section-title"><div class="step-num">3</div>参考プロンプト（任意・未選択ならAIが自動選定）</div>
+          <div class="section-title"><div class="step-num">4</div>参考プロンプト（任意・未選択ならAIが自動選定）</div>
           <div>
             <label>手動で指定したい場合のみ選択（通常は空でOK。AIが候補から自動で選びます）</label>
             <input type="text" id="refSearch" placeholder="🔍 参考プロンプトを検索..." oninput="filterRefPrompts()" style="margin-bottom:8px;">
@@ -953,7 +971,7 @@
       <div style="display:flex;flex-direction:column;gap:16px;">
 
         <div class="gen-section" style="flex:1;">
-          <div class="section-title"><div class="step-num">4</div>自動生成されたプロンプト</div>
+          <div class="section-title"><div class="step-num">5</div>自動生成されたプロンプト</div>
 
           <div class="gen-prompt-box empty" id="generatedPromptBox">
             ← 左側で条件を入力して生成ボタンを押してください
@@ -1417,10 +1435,11 @@ async function checkLocalServer() {
 }
 
 // ============================================================
-// 専門性／回答の詳細度スライダー
+// 専門性／回答の詳細度／出力ボリュームスライダー
 // ============================================================
 const SLIDER_SCALE_LABELS = ['とてもやさしく', 'やさしめ', '標準', 'やや専門的', '専門的'];
 const DETAIL_SCALE_LABELS = ['ざっくり', 'やや簡潔', '標準', 'やや詳細', '精密・網羅的'];
+const VOLUME_SCALE_LABELS = ['とても短め', '短め', '標準', 'やや長め', '長め'];
 
 const EXPERTISE_PROMPT_TEXT = [
   '専門用語を一切使わず、初心者にも分かるように徹底的にやさしく説明する',
@@ -1436,11 +1455,23 @@ const DETAIL_PROMPT_TEXT = [
   'やや詳しく、背景・理由・具体例も含めて答える',
   '精密かつ網羅的に、詳細な根拠・手順・注意点まで含めて答える'
 ];
+const VOLUME_PROMPT_TEXT = [
+  '全体を数行程度の、とても短い分量で答える',
+  '短めの分量で、コンパクトに答える',
+  '標準的な分量で答える',
+  'やや長めの分量で、しっかり書き込んで答える',
+  '長め・じっくりとした分量で、読み応えのある内容で答える'
+];
+
+const SLIDER_LABEL_MAP = {
+  expertiseLevel: SLIDER_SCALE_LABELS,
+  detailLevel: DETAIL_SCALE_LABELS,
+  volumeLevel: VOLUME_SCALE_LABELS
+};
 
 function updateSliderLabel(id) {
   const val = parseInt(document.getElementById(id).value, 10);
-  const labels = (id === 'expertiseLevel') ? SLIDER_SCALE_LABELS : DETAIL_SCALE_LABELS;
-  document.getElementById(id + 'Label').textContent = labels[val - 1];
+  document.getElementById(id + 'Label').textContent = SLIDER_LABEL_MAP[id][val - 1];
 }
 
 // ============================================================
@@ -1523,8 +1554,10 @@ function renderQuestionWizard(questions) {
   document.getElementById('questionWizard').style.display = 'block';
 }
 
+const AXIS_TO_SLIDER = { expertise: 'expertiseLevel', detail: 'detailLevel', volume: 'volumeLevel' };
+
 function applyQuestionAnswer(axis, level, clickedBtn, container) {
-  const sliderId = (axis === 'expertise') ? 'expertiseLevel' : 'detailLevel';
+  const sliderId = AXIS_TO_SLIDER[axis] || 'detailLevel';
   document.getElementById(sliderId).value = level;
   updateSliderLabel(sliderId);
   container.querySelectorAll('button').forEach(b => {
@@ -1542,6 +1575,7 @@ async function generatePrompt() {
   const generateBtn  = document.getElementById('generateBtn');
   const expertiseText  = EXPERTISE_PROMPT_TEXT[parseInt(document.getElementById('expertiseLevel').value, 10) - 1];
   const detailText     = DETAIL_PROMPT_TEXT[parseInt(document.getElementById('detailLevel').value, 10) - 1];
+  const volumeText     = VOLUME_PROMPT_TEXT[parseInt(document.getElementById('volumeLevel').value, 10) - 1];
   const fullStructure  = document.getElementById('fullStructure').checked;
 
   if (!requirement) {
@@ -1578,7 +1612,7 @@ async function generatePrompt() {
     const res = await fetch(LOCAL_SERVER_URL + '/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetAI, requirement, candidates, expertiseText, detailText, fullStructure })
+      body: JSON.stringify({ targetAI, requirement, candidates, expertiseText, detailText, volumeText, fullStructure })
     });
     data = await res.json();
   } catch (e) {

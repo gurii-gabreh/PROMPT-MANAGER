@@ -57,7 +57,7 @@ function readJsonBody(req) {
 // ============================================================
 // claude CLI に渡すメタプロンプトを組み立てる
 // ============================================================
-function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, detailText, fullStructure }) {
+function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, detailText, volumeText, fullStructure }) {
   let p = '';
   p += `あなたはプロのプロンプトエンジニアです。以下の依頼内容に基づき、${targetAI}向けの高品質なプロンプトを作成してください。\n\n`;
   p += `## 依頼内容\n${requirement}\n\n`;
@@ -89,6 +89,9 @@ function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, det
   if (detailText) {
     p += `- このプロンプトを使ってAIに回答させる際の詳細度は次の水準にするよう、プロンプト内に明記すること：${detailText}\n`;
   }
+  if (volumeText) {
+    p += `- このプロンプトを使ってAIに回答させる際の分量は次の水準にするよう、プロンプト内に明記すること：${volumeText}\n`;
+  }
   p += `\n`;
   p += `## 出力形式（厳守・これ以外の前置きや説明文は一切書かないこと）\n`;
   p += `1行目：「REF_USED: <選んだ候補のID、無ければnone>」とだけ書く\n`;
@@ -111,7 +114,7 @@ function buildQuestionsPrompt({ targetAI, requirement }) {
   let p = '';
   p += `あなたはプロンプト設計のヒアリングを行うアシスタントです。\n`;
   p += `以下の依頼内容をもとに、${targetAI}向けプロンプトを作る上で重要な\n`;
-  p += `「専門性レベル」と「回答の詳細度」を判断するための質問を、それぞれ1問ずつ、合計2問作成してください。\n`;
+  p += `「専門性レベル」「回答の詳細度」「出力ボリューム」を判断するための質問を、それぞれ1問ずつ、合計3問作成してください。\n`;
   p += `質問・選択肢は依頼内容に即した具体的な言葉にすること（例：読み手が誰か、何のために使うか等）。\n\n`;
   p += `## 依頼内容\n${requirement}\n\n`;
   p += `## 出力形式（厳守・これ以外の前置きや説明文は一切書かないこと）\n`;
@@ -127,7 +130,14 @@ function buildQuestionsPrompt({ targetAI, requirement }) {
   p += `OPTION: <選択肢文> | LEVEL:3\n`;
   p += `OPTION: <選択肢文> | LEVEL:5\n`;
   p += `---\n`;
-  p += `LEVEL:1は「やさしく／ざっくり」、LEVEL:3は「標準」、LEVEL:5は「専門的／精密」に対応する。\n`;
+  p += `AXIS: volume\n`;
+  p += `QUESTION: <質問文>\n`;
+  p += `OPTION: <選択肢文> | LEVEL:1\n`;
+  p += `OPTION: <選択肢文> | LEVEL:3\n`;
+  p += `OPTION: <選択肢文> | LEVEL:5\n`;
+  p += `---\n`;
+  p += `LEVEL:1は「やさしく／ざっくり／短め」、LEVEL:3は「標準」、LEVEL:5は「専門的／精密／長め」に対応する\n`;
+  p += `（axisがvolumeの場合のLEVELは出力の分量の長さを表す）。\n`;
   return p;
 }
 
