@@ -943,6 +943,24 @@
               <div class="slider-scale"><span>短め</span><span>長め</span></div>
             </div>
           </div>
+
+          <div class="slider-group">
+            <button class="btn btn-secondary" onclick="previewAnswer()" id="previewBtn" style="width:100%;">👀 プレビューを見る（任意）</button>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">今の設定で回答した場合のサンプルを確認できます</div>
+
+            <div id="previewBox" style="display:none;margin-top:10px;">
+              <div class="modal-body-label" style="margin-bottom:6px;">プレビュー</div>
+              <div class="gen-prompt-box" id="previewContent" style="max-height:220px;"></div>
+
+              <div style="margin-top:10px;">
+                <label>こういう回答が欲しい、という要望があれば入力してください</label>
+                <textarea id="previewFeedback" rows="2" placeholder="例：もっと具体例を増やしてほしい／もっとフレンドリーな口調で"></textarea>
+                <button class="btn btn-secondary" onclick="applyPreviewFeedback()" style="margin-top:6px;width:100%;">🔄 要望を反映してプレビュー更新</button>
+              </div>
+
+              <div id="feedbackHistoryBox" style="display:none;margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8;"></div>
+            </div>
+          </div>
         </div>
 
         <div class="gen-section">
@@ -1475,6 +1493,101 @@ function updateSliderLabel(id) {
 }
 
 // ============================================================
+// プレビュー（任意）：今の設定で回答した場合のサンプルを確認し、
+// 要望を追加してプレビューを更新できる。反映済みの要望は最終生成にも引き継がれる。
+// ============================================================
+let previewFeedbackHistory = [];
+
+function currentLevelTexts() {
+  return {
+    expertiseText: EXPERTISE_PROMPT_TEXT[parseInt(document.getElementById('expertiseLevel').value, 10) - 1],
+    detailText:    DETAIL_PROMPT_TEXT[parseInt(document.getElementById('detailLevel').value, 10) - 1],
+    volumeText:    VOLUME_PROMPT_TEXT[parseInt(document.getElementById('volumeLevel').value, 10) - 1]
+  };
+}
+
+async function previewAnswer() {
+  const targetAI    = document.getElementById('targetAI').value;
+  const requirement = document.getElementById('userRequirement').value.trim();
+
+  if (!requirement) {
+    showToast('⚠️ 「やりたいこと」を入力してください', 'error');
+    return;
+  }
+
+  const online = await checkLocalServer();
+  if (!online) {
+    showToast(
+      '⚠️ ローカル生成サーバーに接続できません。Macでターミナルを起動してください（local-server フォルダで node server.js）',
+      'error', 7000
+    );
+    return;
+  }
+
+  const previewBtn = document.getElementById('previewBtn');
+  const originalLabel = previewBtn.textContent;
+  previewBtn.disabled = true;
+  previewBtn.textContent = 'プレビュー生成中...';
+
+  let data;
+  try {
+    const res = await fetch(LOCAL_SERVER_URL + '/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetAI, requirement, ...currentLevelTexts(), feedbackHistory: previewFeedbackHistory })
+    });
+    data = await res.json();
+  } catch (e) {
+    previewBtn.disabled = false;
+    previewBtn.textContent = originalLabel;
+    showToast('❌ プレビューの取得に失敗しました: ' + e.message, 'error', 7000);
+    return;
+  }
+
+  previewBtn.disabled = false;
+  previewBtn.textContent = originalLabel;
+
+  if (!data || data.status !== 'ok') {
+    showToast('❌ プレビューの生成に失敗しました: ' + (data && data.message || '不明なエラー'), 'error', 7000);
+    return;
+  }
+
+  document.getElementById('previewContent').textContent = data.preview;
+  document.getElementById('previewBox').style.display = 'block';
+}
+
+async function applyPreviewFeedback() {
+  const feedback = document.getElementById('previewFeedback').value.trim();
+  if (!feedback) {
+    showToast('⚠️ 要望を入力してください', 'error');
+    return;
+  }
+  previewFeedbackHistory.push(feedback);
+  document.getElementById('previewFeedback').value = '';
+  renderFeedbackHistory();
+  await previewAnswer();
+}
+
+function clearFeedbackHistory() {
+  previewFeedbackHistory = [];
+  renderFeedbackHistory();
+  showToast('✅ 反映済みの要望をクリアしました', 'success');
+}
+
+function renderFeedbackHistory() {
+  const box = document.getElementById('feedbackHistoryBox');
+  if (previewFeedbackHistory.length === 0) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = '反映済みの要望（生成時にも引き継がれます）：<br>' +
+    previewFeedbackHistory.map((f, i) => `${i + 1}. ${esc(f)}`).join('<br>') +
+    '<br><a href="#" onclick="clearFeedbackHistory(); return false;" style="color:var(--accent2);">✕ クリア</a>';
+}
+
+// ============================================================
 // AIによるレベル感の質問ウィザード（任意・時間があるときに使用）
 // ============================================================
 async function askClarifyingQuestions() {
@@ -1612,7 +1725,7 @@ async function generatePrompt() {
     const res = await fetch(LOCAL_SERVER_URL + '/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetAI, requirement, candidates, expertiseText, detailText, volumeText, fullStructure })
+      body: JSON.stringify({ targetAI, requirement, candidates, expertiseText, detailText, volumeText, fullStructure, feedbackHistory: previewFeedbackHistory })
     });
     data = await res.json();
   } catch (e) {

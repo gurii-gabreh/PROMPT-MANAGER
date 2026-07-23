@@ -57,10 +57,16 @@ function readJsonBody(req) {
 // ============================================================
 // claude CLI に渡すメタプロンプトを組み立てる
 // ============================================================
-function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, detailText, volumeText, fullStructure }) {
+function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, detailText, volumeText, fullStructure, feedbackHistory }) {
   let p = '';
   p += `あなたはプロのプロンプトエンジニアです。以下の依頼内容に基づき、${targetAI}向けの高品質なプロンプトを作成してください。\n\n`;
   p += `## 依頼内容\n${requirement}\n\n`;
+
+  if (Array.isArray(feedbackHistory) && feedbackHistory.length > 0) {
+    p += `## 追加の要望（プレビュー確認時にユーザーから出た要望。必ずプロンプトの内容に反映すること）\n`;
+    feedbackHistory.forEach((f, i) => { p += `${i + 1}. ${f}\n`; });
+    p += `\n`;
+  }
 
   if (Array.isArray(candidates) && candidates.length > 0) {
     p += `## 参考プロンプト候補（chapro.jpより。関連度が高いものがあれば構成・スタイルの参考にし、なければ無視してよい）\n`;
@@ -104,6 +110,27 @@ function buildMetaPrompt({ targetAI, requirement, candidates, expertiseText, det
   } else {
     p += `その後：見出しを付けず、プロンプト本文のみを出力すること\n`;
   }
+  return p;
+}
+
+// ============================================================
+// 現在のレベル設定・要望履歴で回答した場合のサンプル（プレビュー）を作らせる
+// ============================================================
+function buildPreviewPrompt({ targetAI, requirement, expertiseText, detailText, volumeText, feedbackHistory }) {
+  let p = '';
+  p += `あなたは${targetAI}になりきって、以下の依頼に実際に回答するプレビューを作成してください。\n`;
+  p += `これは本番のプロンプトではありません。「このレベル設定で生成した場合、だいたいこんな回答になる」という\n`;
+  p += `確認用のサンプル回答です。\n\n`;
+  p += `## 依頼内容\n${requirement}\n\n`;
+  if (expertiseText) p += `## 専門性レベル\n${expertiseText}\n\n`;
+  if (detailText)    p += `## 回答の詳細度\n${detailText}\n\n`;
+  if (volumeText)    p += `## 出力ボリューム\n${volumeText}\n\n`;
+  if (Array.isArray(feedbackHistory) && feedbackHistory.length > 0) {
+    p += `## 追加の要望（必ず反映すること）\n`;
+    feedbackHistory.forEach((f, i) => { p += `${i + 1}. ${f}\n`; });
+    p += `\n`;
+  }
+  p += `## 出力\n上記の条件をすべて満たすサンプル回答のみを出力してください。前置きや説明は不要です。\n`;
   return p;
 }
 
@@ -289,6 +316,20 @@ const server = http.createServer(async (req, res) => {
       const raw = await runClaude(promptText);
       const questions = parseQuestions(raw);
       return sendJson(res, 200, { status: 'ok', questions });
+    } catch (e) {
+      return sendJson(res, 500, { status: 'error', message: String(e && e.message || e) });
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/preview') {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.targetAI || !body.requirement) {
+        return sendJson(res, 400, { status: 'error', message: 'targetAI / requirement は必須です' });
+      }
+      const promptText = buildPreviewPrompt(body);
+      const raw = await runClaude(promptText);
+      return sendJson(res, 200, { status: 'ok', preview: raw.trim() });
     } catch (e) {
       return sendJson(res, 500, { status: 'error', message: String(e && e.message || e) });
     }
