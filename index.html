@@ -983,6 +983,34 @@
           ✨ プロンプトを自動生成する
         </button>
         <div style="font-size:11px;color:var(--text2);">※ 生成にはローカル生成サーバー（Mac側でターミナル起動）が必要です</div>
+
+        <!-- 2026-10-11追加。ローカル生成サーバー（Mac限定・claude CLI）が無い環境
+             （携帯等）でも使えるよう、「依頼文を作成してコピー→自分で使っているAI
+             (Claude/ChatGPT/Gemini等)に貼り付け→その回答をこの画面に貼り付けて
+             記録」という半自動方式を追加した。既存のローカルサーバー方式は変更せず、
+             そのまま併存させる（ユーザー指示「古い仕様も使えるように画面上にも
+             残しておいて」）。依頼文の組み立て（buildMetaPromptClient）・回答の
+             解析（parseClaudeOutputClient）は、local-server/server.jsの
+             buildMetaPrompt/parseClaudeOutputと同じロジックをブラウザ側に
+             そのまま移植したもの（出力形式・パース結果の構造を揃えることで、
+             下流の表示・履歴記録処理をローカルサーバー方式と共通化している）。 -->
+        <div class="gen-section" style="margin-top:4px;">
+          <div class="section-title">🅱️ 別の方法：AIに自分で貼り付けて回答をもらう（ローカルサーバー不要）</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">ローカルサーバーを起動していない場合や、携帯から使う場合はこちら。依頼文を作成してコピーし、自分が使っているAI（Claude/ChatGPT/Gemini等）に貼り付けてください。</div>
+          <button class="btn btn-secondary" onclick="buildPasteRequest()" style="padding:12px;width:100%;" id="buildPasteBtn">
+            📋 AIに貼り付ける依頼文を作成
+          </button>
+          <div class="gen-prompt-box empty" id="pasteRequestBox" style="display:none;margin-top:8px;"></div>
+          <button class="btn btn-secondary" onclick="copyPasteRequest()" id="copyPasteRequestBtn" style="display:none;margin-top:6px;">📋 依頼文をコピー</button>
+
+          <div id="pasteAnswerWrap" style="display:none;margin-top:14px;">
+            <label>AIから返ってきた回答をここに貼り付け</label>
+            <textarea id="pasteAnswerInput" rows="6" style="width:100%;font-size:12px;" placeholder="AIの回答をそのまま貼り付けてください"></textarea>
+            <button class="btn btn-primary" onclick="applyPastedAnswer()" style="padding:12px;width:100%;margin-top:6px;" id="applyPasteBtn">
+              ✅ 貼り付けた回答を反映する
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- 右カラム：生成結果 -->
@@ -1761,6 +1789,165 @@ async function generatePrompt() {
 
   showToast('✅ 生成が完了しました。内容を確認して「履歴記録」で保存してください', 'success');
   openStopServerModal();
+}
+
+// ============================================================
+// 2026-10-11追加: ローカル生成サーバー不要の半自動方式（依頼文コピー→自分でAIに
+// 貼り付け→回答を貼り付けて反映）。buildMetaPromptClient/parseClaudeOutputClientは
+// local-server/server.jsのbuildMetaPrompt/parseClaudeOutputをブラウザ側へそのまま
+// 移植したもの（値を変えたら両方直すこと）。
+// ============================================================
+function buildMetaPromptClient({ targetAI, requirement, candidates, expertiseText, detailText, volumeText, fullStructure, feedbackHistory }) {
+  let p = '';
+  p += `あなたはプロのプロンプトエンジニアです。以下の依頼内容に基づき、${targetAI}向けの高品質なプロンプトを作成してください。\n\n`;
+  p += `## 依頼内容\n${requirement}\n\n`;
+
+  if (Array.isArray(feedbackHistory) && feedbackHistory.length > 0) {
+    p += `## 追加の要望（プレビュー確認時にユーザーから出た要望。必ずプロンプトの内容に反映すること）\n`;
+    feedbackHistory.forEach((f, i) => { p += `${i + 1}. ${f}\n`; });
+    p += `\n`;
+  }
+
+  if (Array.isArray(candidates) && candidates.length > 0) {
+    p += `## 参考プロンプト候補（chapro.jpより。関連度が高いものがあれば構成・スタイルの参考にし、なければ無視してよい）\n`;
+    candidates.forEach(c => {
+      const body = String(c.body || '').slice(0, 800);
+      p += `---\nID: ${c.id}\nタイトル: ${c.title}\nカテゴリ: ${c.category}\n本文:\n${body}\n`;
+    });
+    p += `---\n\n`;
+    p += `上記候補の中から、依頼内容に最も関連するものを1つだけ選んでください（関連するものが無ければ「none」としてください）。\n\n`;
+  }
+
+  p += `## 作成条件\n`;
+  p += `- 対象AI：${targetAI}\n`;
+  p += `- 言語：日本語\n`;
+  p += `- ${targetAI}の特性（能力・制約・得意分野）を最大限に活かした内容にすること\n`;
+  if (fullStructure) {
+    p += `- 誰でも使いやすいよう、プロンプトの冒頭に使い方の簡単な説明を入れること\n`;
+    p += `- プロンプト本文と使用例を含めること\n`;
+  } else {
+    p += `- 前置きや使い方の説明、使用例などは付けず、プロンプト本文だけをシンプルに作成すること\n`;
+  }
+  if (expertiseText) {
+    p += `- 生成する【プロンプト本文】自体の説明・言い回しを、次の専門性レベルで書くこと：${expertiseText}\n`;
+    p += `  （さらに、このプロンプトを使ってAIに回答させる際も同じ専門性レベルで答えるよう、プロンプト内に明記すること）\n`;
+  }
+  if (detailText) {
+    p += `- このプロンプトを使ってAIに回答させる際の詳細度は次の水準にするよう、プロンプト内に明記すること：${detailText}\n`;
+  }
+  if (volumeText) {
+    p += `- このプロンプトを使ってAIに回答させる際の分量は次の水準にするよう、プロンプト内に明記すること：${volumeText}\n`;
+  }
+  p += `\n`;
+  p += `## 出力形式（厳守・これ以外の前置きや説明文は一切書かないこと）\n`;
+  p += `1行目：「REF_USED: <選んだ候補のID、無ければnone>」とだけ書く\n`;
+  p += `2行目：「REF_REASON:」とだけ書く\n`;
+  p += `3行目以降：なぜその候補を選んだか（選ばなかった場合はなぜ参考プロンプト無しで作成したか）を、「- 」で始まる箇条書きで1〜3行\n`;
+  p += `箇条書きの直後に「---」とだけ書く\n`;
+  if (fullStructure) {
+    p += `その後：以下の見出しに沿った本文\n`;
+    p += `【プロンプトタイトル】\n【プロンプト本文】\n【使い方・使用例】\n【期待できる効果】\n`;
+  } else {
+    p += `その後：見出しを付けず、プロンプト本文のみを出力すること\n`;
+  }
+  return p;
+}
+
+function parseClaudeOutputClient(raw) {
+  const lines = String(raw).replace(/\r\n/g, '\n').split('\n');
+  let refUsed = null;
+  let refReasons = [];
+  let idx = 0;
+
+  if (lines[idx] && lines[idx].trim().toUpperCase().startsWith('REF_USED:')) {
+    const val = lines[idx].split(':').slice(1).join(':').trim();
+    refUsed = (val && val.toLowerCase() !== 'none' && val !== 'なし') ? val : null;
+    idx++;
+
+    if (lines[idx] && lines[idx].trim().toUpperCase().startsWith('REF_REASON:')) {
+      idx++;
+      while (lines[idx] && lines[idx].trim().startsWith('-')) {
+        refReasons.push(lines[idx].trim().replace(/^-\s*/, ''));
+        idx++;
+      }
+    }
+
+    if (lines[idx] && lines[idx].trim() === '---') idx++;
+  }
+
+  return { refUsed, refReasons, generated: lines.slice(idx).join('\n').trim() };
+}
+
+let lastPasteCandidates = [];
+
+async function buildPasteRequest() {
+  const targetAI     = document.getElementById('targetAI').value;
+  const requirement  = document.getElementById('userRequirement').value.trim();
+  const expertiseText  = EXPERTISE_PROMPT_TEXT[parseInt(document.getElementById('expertiseLevel').value, 10) - 1];
+  const detailText     = DETAIL_PROMPT_TEXT[parseInt(document.getElementById('detailLevel').value, 10) - 1];
+  const volumeText     = VOLUME_PROMPT_TEXT[parseInt(document.getElementById('volumeLevel').value, 10) - 1];
+  const fullStructure  = document.getElementById('fullStructure').checked;
+
+  if (!requirement) {
+    showToast('⚠️ 「やりたいこと」を入力してください', 'error');
+    return;
+  }
+
+  if (allPrompts.length === 0) await loadRefPrompts();
+  lastPasteCandidates = selectedRef ? [selectedRef] : scoreCandidates(requirement, allPrompts, 5);
+
+  const requestText = buildMetaPromptClient({
+    targetAI, requirement, candidates: lastPasteCandidates,
+    expertiseText, detailText, volumeText, fullStructure,
+    feedbackHistory: previewFeedbackHistory
+  });
+
+  const box = document.getElementById('pasteRequestBox');
+  box.classList.remove('empty');
+  box.textContent = requestText;
+  box.style.display = 'block';
+  document.getElementById('copyPasteRequestBtn').style.display = 'inline-flex';
+  document.getElementById('pasteAnswerWrap').style.display = 'block';
+  showToast('✅ 依頼文を作成しました。コピーして自分のAIに貼り付けてください', 'success');
+}
+
+function copyPasteRequest() {
+  const text = document.getElementById('pasteRequestBox').textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✅ 依頼文をコピーしました', 'success');
+  });
+}
+
+function applyPastedAnswer() {
+  const raw = document.getElementById('pasteAnswerInput').value.trim();
+  if (!raw) {
+    showToast('⚠️ AIの回答を貼り付けてください', 'error');
+    return;
+  }
+
+  const { refUsed, refReasons, generated } = parseClaudeOutputClient(raw);
+  const matchedCandidate = refUsed ? lastPasteCandidates.find(c => String(c.id) === String(refUsed)) : null;
+
+  const targetAI    = document.getElementById('targetAI').value;
+  const requirement = document.getElementById('userRequirement').value.trim();
+
+  const box = document.getElementById('generatedPromptBox');
+  box.classList.remove('empty');
+  box.textContent = generated || raw;
+  document.getElementById('copyBtn').style.display = 'inline-flex';
+  document.getElementById('recordBtn').style.display = 'inline-flex';
+
+  renderRefSummary(matchedCandidate, refReasons);
+
+  lastGeneration = {
+    targetAI, requirement,
+    generated: generated || raw,
+    refTitle: matchedCandidate ? matchedCandidate.title : null,
+    refBody:  matchedCandidate ? matchedCandidate.body  : null
+  };
+
+  showToast('✅ 回答を反映しました。内容を確認して「履歴記録」で保存してください', 'success');
 }
 
 function renderRefSummary(candidate, reasons) {
